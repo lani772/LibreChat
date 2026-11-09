@@ -91,3 +91,30 @@ The MCP Servers side panel includes a Google Workspace connection manager. It cr
 The built-in `google_drive` agent/assistant tool is registered through LibreChat's manifest, tool-definition registry, and existing runtime loader. Its actions are `search_files` and `get_file_metadata`. It selects the sole connected personal account automatically, or returns safe account IDs/names for explicit selection when multiple accounts are connected. The selected installation ID is never treated as authorization: the connector service rechecks trusted tenant, membership, installation state, owner/grant, and tenant role at invocation time. Tool output contains only allowlisted metadata and safe error messages. The tool is read-only and does not provide content download/export, upload, edit, delete, or sharing operations.
 
 Tests have been authored for installation list/create routes, Google Drive tool account selection, metadata lookup, and provider error redaction. They have not been executed in a dependency-enabled checkout.
+
+
+## Connector credential key rotation
+
+The AES-256-GCM envelope now supports a key ID while retaining decryption compatibility with existing `gcm1` envelopes that do not contain one.
+
+For a multi-key deployment, configure:
+- `CONNECTOR_CREDENTIALS_KEYRING`: JSON object mapping key IDs to 32-byte hexadecimal keys (maximum 20 keys).
+- `CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID`: key ID used for all new credential writes.
+- `CONNECTOR_CREDENTIALS_KEY`: retain the previous single-key value while legacy envelopes without a key ID remain in the database.
+
+Example (use secret-manager values, not these sample keys):
+
+```env
+CONNECTOR_CREDENTIALS_KEYRING={"2026-10":"<64-hex-old-key>","2026-11":"<64-hex-new-key>"}
+CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID=2026-11
+CONNECTOR_CREDENTIALS_KEY=<64-hex-legacy-key>
+```
+
+Rotation procedure:
+1. Back up the old key securely and add both old and new key IDs to the keyring.
+2. Keep `CONNECTOR_CREDENTIALS_KEY` set to the old key for existing envelopes that have no key ID.
+3. Set the active key ID to the new key. New writes use that key; decryption continues to use the key ID embedded in newer envelopes.
+4. Re-encrypt all remaining legacy credentials under the active key before removing the legacy key. Token refresh writes naturally re-encrypt credentials when they are refreshed, but this alone is not a complete fleet-wide rotation.
+5. Verify no stored credential envelopes reference a retired key, then remove that key from the keyring and retire it in the secret manager.
+
+Unknown key IDs, missing keys, malformed keyrings, and authentication-tag failures fail closed. The keyring is a deployment-managed key distribution mechanism, not a KMS/HSM integration: production deployments should source it from a KMS/HSM-backed secret manager and define an audited re-encryption job before retiring keys.
