@@ -257,12 +257,15 @@ export function createConnectorInstallationMethods(
       { _id: installationId, state: { $ne: 'revoked' } },
       { $set: { state: 'revoked', credentialRef: null }, $inc: { version: 1 } },
     ).exec();
-    if (result.modifiedCount === 1) {
+    const alreadyRevoked =
+      result.modifiedCount === 0 &&
+      (await Model.exists({ _id: installationId, state: 'revoked' }).exec());
+    if (result.modifiedCount === 1 || alreadyRevoked) {
       // Authorization is revoked before ciphertext cleanup. If cleanup fails, the
-      // installation remains unusable and an operator can safely retry cleanup.
+      // installation remains unusable and a repeated disconnect can retry cleanup.
       await Credential.deleteOne({ installationId }).exec();
     }
-    return result.modifiedCount === 1;
+    return result.modifiedCount === 1 || Boolean(alreadyRevoked);
   }
 
 
