@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { tenantStorage } from '~/config/tenantContext';
 import { createConnectorInstallationModel } from './connectorInstallation';
+import { createMCPServerModel } from './mcpServer';
 import { _resetStrictCache } from './plugins/tenantIsolation';
 import { createConnectorInstallationMethods } from '~/methods/connectorInstallation';
 
@@ -11,6 +12,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
   createConnectorInstallationModel(mongoose);
+  createMCPServerModel(mongoose);
 });
 
 afterAll(async () => {
@@ -43,6 +45,84 @@ describe('connector installation persistence', () => {
     );
     expect(listed).toHaveLength(1);
     expect(listed[0].credentialRef).toBeUndefined();
+  });
+
+  it('binds an installation only to an MCP server authored by its owner', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const otherOwnerId = new mongoose.Types.ObjectId();
+    const installation = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: ownerId.toString() },
+      async () =>
+        methods().createConnectorInstallation({
+          provider: 'chatwoot',
+          displayName: 'Support',
+          visibility: 'personal',
+        }),
+    );
+    const ownedServer = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: ownerId.toString() },
+      async () =>
+        mongoose.models.MCPServer.create({
+          serverName: 'support-owned',
+          normalizedServerName: 'support-owned',
+          config: { title: 'Support MCP' },
+          author: ownerId,
+        }),
+    );
+    const foreignServer = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: otherOwnerId.toString() },
+      async () =>
+        mongoose.models.MCPServer.create({
+          serverName: 'support-foreign',
+          normalizedServerName: 'support-foreign',
+          config: { title: 'Foreign Support MCP' },
+          author: otherOwnerId,
+        }),
+    );
+
+    await expect(
+      tenantStorage.run(
+        { tenantId: 'tenant-a', userId: ownerId.toString() },
+        async () =>
+          methods().bindConnectorInstallationToMCPServer({
+            installationId: String(installation._id),
+            mcpServerId: String(foreignServer._id),
+            expectedVersion: 0,
+          }),
+      ),
+    ).resolves.toBeNull();
+
+    const bound = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: ownerId.toString() },
+      async () =>
+        methods().bindConnectorInstallationToMCPServer({
+          installationId: String(installation._id),
+          mcpServerId: String(ownedServer._id),
+          expectedVersion: 0,
+        }),
+    );
+    expect(bound?.mcpServerId).toBe(String(ownedServer._id));
+    expect(bound?.version).toBe(1);
+    expect(bound?.credentialRef).toBeUndefined();
+
+    const resolved = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: ownerId.toString() },
+      async () => methods().getConnectorInstallationByMCPServerId(String(ownedServer._id)),
+    );
+    expect(resolved?._id.toString()).toBe(String(installation._id));
+    expect(resolved?.credentialRef).toBeUndefined();
+
+    await expect(
+      tenantStorage.run(
+        { tenantId: 'tenant-a', userId: ownerId.toString() },
+        async () =>
+          methods().bindConnectorInstallationToMCPServer({
+            installationId: String(installation._id),
+            mcpServerId: String(ownedServer._id),
+            expectedVersion: 0,
+          }),
+      ),
+    ).resolves.toBeNull();
   });
 
   it('does not return installations belonging to another tenant', async () => {
