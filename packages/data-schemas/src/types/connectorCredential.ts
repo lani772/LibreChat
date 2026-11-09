@@ -2,7 +2,7 @@ import type { Types } from 'mongoose';
 
 export interface ConnectorCredentialDocument {
   _id: Types.ObjectId;
-  tenantId?: string;
+  tenantId: string;
   installationId: string;
   ownerUserId: string;
   provider: string;
