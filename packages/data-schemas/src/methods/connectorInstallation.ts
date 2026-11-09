@@ -6,6 +6,7 @@ import type {
   ConnectorInstallationState,
   CreateConnectorInstallationInput,
 } from '~/types/connectorInstallation';
+import type { MCPServerDocument } from '~/types/mcp';
 
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const ERROR_CODE_PATTERN = /^[a-zA-Z0-9_.-]{1,80}$/;
