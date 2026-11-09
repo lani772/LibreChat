@@ -133,6 +133,26 @@ export class GoogleWorkspaceOAuthFlow {
     return { authorizationUrl: url.toString(), expiresAt };
   }
 
+  /** Consume a provider-denied/cancelled callback so its transaction cannot be replayed. */
+  async cancel(input: { state: string }): Promise<boolean> {
+    if (!STATE_PATTERN.test(input.state)) return false;
+    const pending = await this.deps.states.consume(sha256(input.state));
+    if (!pending || pending.expiresAt.getTime() <= this.now()) return false;
+    const identity = { tenantId: pending.tenantId, principalId: pending.principalId };
+    await this.deps.runWithIdentity(identity, async () => {
+      const installation = await this.deps.installations.getConnectorInstallation(pending.installationId);
+      if (installation && installation.state !== 'revoked' && installation.state !== 'connected') {
+        await this.deps.installations.transitionConnectorInstallation({
+          installationId: pending.installationId,
+          expectedVersion: installation.version,
+          state: 'error',
+          lastErrorCode: 'oauth_user_cancelled',
+        });
+      }
+    });
+    return true;
+  }
+
   async complete(input: { state: string; code: string }): Promise<{ installationId: string; connected: true }> {
     if (!STATE_PATTERN.test(input.state) || !input.code?.trim()) {
       throw new Error('Invalid Google OAuth callback');
