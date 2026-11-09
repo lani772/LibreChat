@@ -9,9 +9,13 @@ const connectorCredentialSchema = new Schema<ConnectorCredentialDocument>(
     provider: { type: String, required: true, trim: true, lowercase: true },
     encryptedPayload: { type: String, required: true, select: false, maxlength: 140_000 },
     keyVersion: { type: String, enum: ['gcm1'], required: true },
+    refreshLeaseToken: { type: String, select: false, maxlength: 128 },
+    refreshLeaseUntil: { type: Date, select: false },
   },
   { timestamps: true, strict: 'throw' },
 );
+
+
 
 connectorCredentialSchema.index(
   { tenantId: 1, installationId: 1 },
