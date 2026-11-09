@@ -11,8 +11,14 @@ import type { ScheduleMCPConsentStorage } from './scheduleConsent';
 import type { ClearFileCodeEnvRefsParams } from '~/types/file';
 import type { FileStorageMethods } from './fileStorage';
 import { createToolApprovalGrantMethods } from './toolApprovalGrant';
-import { createConnectorInstallationMethods, type ConnectorInstallationMethods } from './connectorInstallation';
-import { createConnectorCredentialMethods, type ConnectorCredentialMethods } from './connectorCredential';
+import {
+  createConnectorInstallationMethods,
+  type ConnectorInstallationMethods,
+} from './connectorInstallation';
+import {
+  createConnectorCredentialMethods,
+  type ConnectorCredentialMethods,
+} from './connectorCredential';
 import { createScheduleMCPConsentStorage } from './scheduleConsent';
 export { createScheduleMCPConsentStorage } from './scheduleConsent';
 export type { ScheduleMCPConsentStorage, ScheduleConsentSnapshot } from './scheduleConsent';
