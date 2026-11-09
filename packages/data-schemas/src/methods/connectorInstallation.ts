@@ -57,6 +57,7 @@ export function createConnectorInstallationMethods(
   async function createConnectorInstallation(
     input: CreateConnectorInstallationInput,
   ): Promise<ConnectorInstallationDocument> {
+    requireConnectorTenant('create');
     const provider = input.provider.trim().toLowerCase();
     const displayName = input.displayName.trim();
     if (!PROVIDER_PATTERN.test(provider)) {
@@ -89,6 +90,7 @@ export function createConnectorInstallationMethods(
   async function getConnectorInstallation(
     installationId: string,
   ): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('read');
     if (!mongoose.isValidObjectId(installationId)) return null;
     return Model.findById(installationId)
       .lean<ConnectorInstallationDocument>()
@@ -101,6 +103,7 @@ export function createConnectorInstallationMethods(
     state?: ConnectorInstallationState;
     limit?: number;
   } = {}): Promise<ConnectorInstallationDocument[]> {
+    requireConnectorTenant('list');
     const filter: Record<string, unknown> = {};
     if (options.ownerUserId) filter.ownerUserId = options.ownerUserId;
     if (options.provider) filter.provider = options.provider.toLowerCase();
@@ -120,6 +123,7 @@ export function createConnectorInstallationMethods(
     state: ConnectorInstallationState;
     lastErrorCode?: string;
   }): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('state transition');
     if (!mongoose.isValidObjectId(params.installationId)) return null;
     if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
       throw new Error('Invalid connector installation version');
@@ -156,6 +160,7 @@ export function createConnectorInstallationMethods(
   }
 
   async function revokeConnectorInstallation(installationId: string): Promise<boolean> {
+    requireConnectorTenant('revoke');
     if (!mongoose.isValidObjectId(installationId)) return false;
     const result = await Model.updateOne(
       { _id: installationId, state: { $ne: 'revoked' } },
