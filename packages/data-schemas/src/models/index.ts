@@ -9,6 +9,7 @@ import { createRefreshTokenBridgeModel } from './refreshTokenBridge';
 import { createAgentTriggerDeliveryModel } from './triggerDelivery';
 import { createToolApprovalGrantModel } from './toolApprovalGrant';
 import { createConnectorInstallationModel } from './connectorInstallation';
+import { createConnectorCredentialModel } from './connectorCredential';
 import { createSkillUploadIntentModel } from './skillUploadIntent';
 import { createSubagentContentModel } from './subagentContent';
 import { createSkillSyncStatusModel } from './skillSyncStatus';
@@ -60,6 +61,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   User: ReturnType<typeof createUserModel>;
   ToolApprovalGrant: ReturnType<typeof createToolApprovalGrantModel>;
   ConnectorInstallation: ReturnType<typeof createConnectorInstallationModel>;
+  ConnectorCredential: ReturnType<typeof createConnectorCredentialModel>;
   Token: ReturnType<typeof createTokenModel>;
   Session: ReturnType<typeof createSessionModel>;
   Passkey: ReturnType<typeof createPasskeyModel>;
@@ -116,6 +118,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
     User: createUserModel(mongoose),
     ToolApprovalGrant: createToolApprovalGrantModel(mongoose),
     ConnectorInstallation: createConnectorInstallationModel(mongoose),
+    ConnectorCredential: createConnectorCredentialModel(mongoose),
     Token: createTokenModel(mongoose),
     Session: createSessionModel(mongoose),
     Passkey: createPasskeyModel(mongoose),
