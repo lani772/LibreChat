@@ -26,9 +26,8 @@ describe('connector installation persistence', () => {
   });
 
   it('stamps tenant scope and never exposes credential references in list results', async () => {
-    const created = await tenantStorage.run({ tenantId: 'tenant-a' }, () =>
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
       methods().createConnectorInstallation({
-        ownerUserId: 'user-a',
         provider: 'google-workspace',
         displayName: 'Google Workspace',
         visibility: 'personal',
@@ -53,7 +52,7 @@ describe('connector installation persistence', () => {
         visibility: 'personal',
       }),
     );
-    const visible = await tenantStorage.run({ tenantId: 'tenant-b' }, () =>
+    const visible = await tenantStorage.run({ tenantId: 'tenant-b', userId: 'user-b' }, () =>
       methods().listConnectorInstallations(),
     );
     expect(visible).toHaveLength(0);
