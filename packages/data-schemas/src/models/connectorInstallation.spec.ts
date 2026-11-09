@@ -260,6 +260,15 @@ describe('connector installation persistence', () => {
         credentialRef: 'vault-ref-456',
       }),
     );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      mongoose.models.ConnectorCredential.create({
+        installationId: String(created._id),
+        ownerUserId: 'user-a',
+        provider: 'chatwoot',
+        encryptedPayload: 'encrypted-only-test-payload',
+        keyVersion: 'gcm1',
+      }),
+    );
     const revoked = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().revokeConnectorInstallation(String(created._id)),
     );
@@ -271,6 +280,11 @@ describe('connector installation persistence', () => {
     );
     expect(stored?.state).toBe('revoked');
     expect(stored?.credentialRef).toBeNull();
+    expect(
+      await mongoose.models.ConnectorCredential.countDocuments({
+        installationId: String(created._id),
+      }),
+    ).toBe(0);
   });
 
   it('requires a tenant context when strict isolation is enabled', async () => {
