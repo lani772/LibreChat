@@ -10,6 +10,9 @@ const {
   setMCPToolsChangedRevisionHandler,
   createMCPAppBindingCodec,
   createMCPPolicyResolver,
+  ConnectorService,
+  createConnectorAuditWriter,
+  createConnectorMCPAuthorizationGuard,
   reportStoredMCPTombstones,
 } = require('@librechat/api');
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
@@ -122,7 +125,33 @@ async function initializeMCPs() {
   );
 
   try {
+    // Connector authorization is request-scoped: these adapters read trusted tenant/user
+    // AsyncLocalStorage context inside each MCP discovery and execution request.
+    const connectorService = new ConnectorService({
+      installations: {
+        getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
+      },
+      resolvePrincipalPermissions: async ({ tenantId, principalId }) => {
+        // getUserById runs through the existing tenant-isolated User model. A missing or
+        // differently partitioned principal is not a tenant member. Until a dedicated
+        // tenant-connector permission is defined in LibreChat's role schema, shared
+        // tenant connectors remain denied rather than inheriting broad tenant membership.
+        const principal = await db.getUserById(principalId, 'tenantId');
+        return {
+          isTenantMember: principal?.tenantId === tenantId,
+          canInvokeTenantConnector: false,
+        };
+      },
+      audit: createConnectorAuditWriter((input, options) => db.recordAuditEntry(input, options)),
+    });
+    const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
+      findInstallationByMCPServerId: (mcpServerId) =>
+        db.getConnectorInstallationByMCPServerId(mcpServerId),
+      authorizeInstallation: (installationId) => connectorService.authorize(installationId),
+    });
+
     const mcpManager = await createMCPManager(mcpServers || {}, {
+      connectorAuthorizationGuard,
       catalogRecoveryMaxStateEntries: appConfig?.mcpSettings?.catalogRecovery?.maxStateEntries,
       catalogRecoveryMaxDetachedDiscoveries:
         appConfig?.mcpSettings?.catalogRecovery?.maxDetachedDiscoveries,
