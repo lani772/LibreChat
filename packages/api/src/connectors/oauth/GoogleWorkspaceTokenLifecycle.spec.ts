@@ -45,7 +45,7 @@ function setup(initial = {
   };
   const lifecycle = new GoogleWorkspaceTokenLifecycle({
     adapter,
-    vault,
+    vault: vault as never,
     installations,
     now: () => 5_000,
     newLeaseToken: () => 'lease-token',
