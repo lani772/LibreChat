@@ -170,7 +170,6 @@ export class GoogleWorkspaceOAuthFlow {
         });
         return { installationId: pending.installationId, connected: true as const };
       });
-    }
     } catch (error) {
       await this.deps.runWithIdentity(identity, async () => {
         const current = await this.deps.installations.getConnectorInstallation(pending.installationId);
