@@ -148,11 +148,13 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [x] Preserve ordinary unbound MCP server behavior.
 - [x] Add focused guard tests and MCPManager boundary tests.
 - [x] Use the existing tenant-isolated User lookup to verify membership and the existing hash-chained audit writer for authorization events.
-- [ ] Add a dedicated tenant-shared connector permission to the existing role model. Until then, tenant-shared connector invocation is explicitly denied; do not infer permission from tenant membership or admin labels.
+- [x] Add `MCP_SERVERS.INVOKE_CONNECTORS` to LibreChat's existing role permission schema, typed role model, and role defaults. It is separate from general MCP server use; USER defaults to denied and ADMIN defaults to allowed.
+- [x] Resolve the authenticated user's current tenant role on every authorization check without shared role-cache reads; permission changes apply to the next discovery/tool call.
+- [x] Add focused tests for allowed/denied roles, missing/malformed role data, cross-tenant users, lookup failures, and immediate permission revocation.
 - [ ] Implement the protected credential vault and provider-specific credential lookup/revocation adapters.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
 
-The runtime guard is committed on the feature branch. Test files have been authored but have not been executed in this environment. The membership adapter currently permits personal-owner and explicit-grant checks only when the principal is present in the active tenant partition; tenant-shared connectors remain denied pending a first-class permission.
+The runtime guard and tenant-role permission resolver are committed on the feature branch. Test files have been authored but have not been executed in this environment. Tenant-shared connectors require `MCP_SERVERS.INVOKE_CONNECTORS`; general `MCP_SERVERS.USE` does not grant connector invocation. The resolver performs uncached tenant-partition role reads on every check. Personal-owner and explicit-grant checks still require the principal to be present in the active tenant partition.
 
 ## Acceptance criteria
 
