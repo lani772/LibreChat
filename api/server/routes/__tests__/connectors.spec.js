@@ -5,6 +5,7 @@ const db = require('~/models');
 const {
   getGoogleWorkspaceOAuthFlow,
   getGoogleWorkspaceTokenLifecycle,
+  getGoogleDriveReadOnlyConnector,
 } = require('~/server/services/initializeMCPs');
 
 jest.mock('@librechat/data-schemas', () => ({
@@ -25,6 +26,7 @@ jest.mock('~/server/middleware', () => ({
 jest.mock('~/server/services/initializeMCPs', () => ({
   getGoogleWorkspaceOAuthFlow: jest.fn(),
   getGoogleWorkspaceTokenLifecycle: jest.fn(),
+  getGoogleDriveReadOnlyConnector: jest.fn(),
 }));
 
 describe('Google Workspace connector routes', () => {
@@ -147,6 +149,62 @@ describe('Google Workspace connector routes', () => {
 
     expect(response.status).toBe(404);
     expect(lifecycle.disconnect).not.toHaveBeenCalled();
+  });
+
+
+  it('lists Drive file metadata through the authorized read-only connector', async () => {
+    const drive = {
+      listFiles: jest.fn().mockResolvedValue({
+        files: [{ id: 'file-1', name: 'Quarterly report', mimeType: 'application/pdf' }],
+        nextPageToken: 'page-2',
+        incompleteSearch: false,
+      }),
+    };
+    getGoogleDriveReadOnlyConnector.mockReturnValue(drive);
+
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/drive/files')
+      .query({ q: "name contains 'Quarterly'", pageSize: '15', pageToken: 'page-1' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.files[0].name).toBe('Quarterly report');
+    expect(drive.listFiles).toHaveBeenCalledWith({
+      installationId: '507f1f77bcf86cd799439011',
+      query: "name contains 'Quarterly'",
+      pageSize: 15,
+      pageToken: 'page-1',
+    });
+    expect(response.headers['cache-control']).toContain('no-store');
+  });
+
+  it('retrieves only file metadata', async () => {
+    const drive = {
+      getFile: jest.fn().mockResolvedValue({ id: 'file-1', name: 'Report', mimeType: 'application/pdf' }),
+    };
+    getGoogleDriveReadOnlyConnector.mockReturnValue(drive);
+
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/drive/files/file-1');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ id: 'file-1', name: 'Report', mimeType: 'application/pdf' });
+    expect(drive.getFile).toHaveBeenCalledWith({
+      installationId: '507f1f77bcf86cd799439011',
+      fileId: 'file-1',
+    });
+  });
+
+  it('maps Drive permission failures to a safe response', async () => {
+    getGoogleDriveReadOnlyConnector.mockReturnValue({
+      listFiles: jest.fn().mockRejectedValue(Object.assign(new Error('provider detail'), {
+        statusCode: 403,
+      })),
+    });
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/drive/files');
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('Google Drive read permission is required');
+    expect(JSON.stringify(response.body)).not.toContain('provider detail');
   });
 
   it('completes the public callback and redirects to a fixed client URL', async () => {
