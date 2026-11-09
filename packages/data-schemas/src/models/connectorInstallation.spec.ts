@@ -35,6 +35,8 @@ describe('connector installation persistence', () => {
       }),
     );
     expect(created.tenantId).toBe('tenant-a');
+    expect(created.ownerUserId).toBe('user-a');
+    expect(created.credentialRef).toBeUndefined();
 
     const listed = await tenantStorage.run({ tenantId: 'tenant-a' }, () =>
       methods().listConnectorInstallations(),
