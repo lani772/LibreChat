@@ -8,7 +8,7 @@ import type {
 
 export interface GoogleOAuthStateMethods {
   createGoogleOAuthState(input: GoogleOAuthStateInput): Promise<void>;
-  consumeGoogleOAuthState(stateHash: string, now?: Date): Promise<GoogleOAuthStateConsumed | null>;
+  consumeGoogleOAuthState(stateHash: string): Promise<GoogleOAuthStateConsumed | null>;
 }
 
 export function createGoogleOAuthStateMethods(
@@ -31,7 +31,8 @@ export function createGoogleOAuthStateMethods(
       !input.encryptedCodeVerifier ||
       input.encryptedCodeVerifier.length > 4096 ||
       !(input.expiresAt instanceof Date) ||
-      input.expiresAt.getTime() <= Date.now()
+      input.expiresAt.getTime() <= Date.now() ||
+      input.expiresAt.getTime() > Date.now() + 11 * 60 * 1000
     ) {
       throw new Error('Invalid Google OAuth state record');
     }
@@ -52,13 +53,12 @@ export function createGoogleOAuthStateMethods(
 
   async function consumeGoogleOAuthState(
     stateHash: string,
-    now = new Date(),
   ): Promise<GoogleOAuthStateConsumed | null> {
     if (!/^[A-Za-z0-9_-]{43}$/.test(stateHash)) return null;
     // Atomic delete: exactly one concurrent callback can obtain this transaction.
     const row = await State.findOneAndDelete({
       stateHash,
-      expiresAt: { $gt: now },
+      expiresAt: { $gt: new Date() },
     })
       .select('+encryptedCodeVerifier stateHash tenantId principalId installationId redirectUri expiresAt')
       .lean<GoogleOAuthStateDocument>()
