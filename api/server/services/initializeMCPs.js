@@ -178,56 +178,59 @@ async function initializeMCPs() {
           clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
         });
         googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
-        adapter,
-        vault: connectorCredentialVault,
-        installations: {
-          getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
-          transitionConnectorInstallation: (input) =>
-            db.transitionConnectorInstallation(input),
-        },
-        states: {
-          create: async (pending) => {
-            const context = {
-              stateHash: pending.stateHash,
-              tenantId: pending.tenantId,
-              principalId: pending.principalId,
-              installationId: pending.installationId,
-            };
-            await db.createGoogleOAuthState({
-              ...pending,
-              encryptedCodeVerifier: encryptGoogleOAuthVerifier(pending.codeVerifier, context),
-            });
+          adapter,
+          vault: connectorCredentialVault,
+          installations: {
+            getConnectorInstallation: (installationId) =>
+              db.getConnectorInstallation(installationId),
+            transitionConnectorInstallation: (input) =>
+              db.transitionConnectorInstallation(input),
           },
-          consume: async (stateHash) => {
-            const pending = await db.consumeGoogleOAuthState(stateHash);
-            if (!pending) return null;
-            const context = {
-              stateHash: pending.stateHash,
-              tenantId: pending.tenantId,
-              principalId: pending.principalId,
-              installationId: pending.installationId,
-            };
-            const { encryptedCodeVerifier, ...safePending } = pending;
-            return {
-              ...safePending,
-              codeVerifier: decryptGoogleOAuthVerifier(encryptedCodeVerifier, context),
-            };
+          states: {
+            create: async (pending) => {
+              const context = {
+                stateHash: pending.stateHash,
+                tenantId: pending.tenantId,
+                principalId: pending.principalId,
+                installationId: pending.installationId,
+              };
+              await db.createGoogleOAuthState({
+                ...pending,
+                encryptedCodeVerifier: encryptGoogleOAuthVerifier(pending.codeVerifier, context),
+              });
+            },
+            consume: async (stateHash) => {
+              const pending = await db.consumeGoogleOAuthState(stateHash);
+              if (!pending) return null;
+              const context = {
+                stateHash: pending.stateHash,
+                tenantId: pending.tenantId,
+                principalId: pending.principalId,
+                installationId: pending.installationId,
+              };
+              const { encryptedCodeVerifier, ...safePending } = pending;
+              return {
+                ...safePending,
+                codeVerifier: decryptGoogleOAuthVerifier(encryptedCodeVerifier, context),
+              };
+            },
           },
-        },
-        runWithIdentity: (identity, operation) => {
-          const current = tenantStorage.getStore() || {};
-          return tenantStorage.run(
-            { ...current, tenantId: identity.tenantId, userId: identity.principalId },
-            async () => operation(),
-          );
-        },
-        clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
-        redirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI,
+          runWithIdentity: (identity, operation) => {
+            const current = tenantStorage.getStore() || {};
+            return tenantStorage.run(
+              { ...current, tenantId: identity.tenantId, userId: identity.principalId },
+              async () => operation(),
+            );
+          },
+          clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
+          redirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI,
           scopes: googleScopes,
         });
       } catch {
         googleWorkspaceOAuthFlow = undefined;
-        logger.warn('[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.');
+        logger.warn(
+          '[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.',
+        );
       }
     } else {
       googleWorkspaceOAuthFlow = undefined;
