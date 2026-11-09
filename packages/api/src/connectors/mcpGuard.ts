@@ -1,6 +1,8 @@
 import type { ConnectorInstallationDocument } from '@librechat/data-schemas';
 import type { ParsedServerConfig } from '../mcp/types';
 
+export type ConnectorMCPAuthorizationGuard = (serverConfig: ParsedServerConfig) => Promise<void>;
+
 export interface ConnectorMCPAuthorizationGuardDependencies {
   /** Tenant-scoped lookup keyed only by the trusted MCPServer database ID. */
   findInstallationByMCPServerId: (
@@ -19,7 +21,7 @@ export interface ConnectorMCPAuthorizationGuardDependencies {
  */
 export function createConnectorMCPAuthorizationGuard(
   deps: ConnectorMCPAuthorizationGuardDependencies,
-): (serverConfig: ParsedServerConfig) => Promise<void> {
+): ConnectorMCPAuthorizationGuard {
   return async (serverConfig) => {
     const mcpServerId = serverConfig.dbId;
     if (!mcpServerId) return;
