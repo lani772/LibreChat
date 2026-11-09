@@ -1,4 +1,5 @@
 import { GoogleWorkspaceTokenLifecycle } from './GoogleWorkspaceTokenLifecycle';
+import { GoogleWorkspaceOAuthError } from './GoogleWorkspaceOAuthAdapter';
 
 const installation = {
   _id: { toString: () => '507f1f77bcf86cd799439011' },
@@ -91,6 +92,20 @@ describe('GoogleWorkspaceTokenLifecycle', () => {
     await expect(lifecycle.getAccessToken('507f1f77bcf86cd799439011')).resolves.toBe('new-access');
     expect(vault.claimRefreshLease).toHaveBeenCalledTimes(2);
     expect(adapter.refreshAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the installation for reauthorization when Google rejects a refresh grant', async () => {
+    const { lifecycle, adapter, installations } = setup();
+    adapter.refreshAccessToken.mockRejectedValue(
+      new GoogleWorkspaceOAuthError('Google OAuth request failed (HTTP 400)', 400, 'invalid_grant'),
+    );
+    await expect(lifecycle.getAccessToken('507f1f77bcf86cd799439011')).rejects.toThrow('HTTP 400');
+    expect(installations.transitionConnectorInstallation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: 'error',
+        lastErrorCode: 'google_reauthorization_required',
+      }),
+    );
   });
 
   it('revokes locally even if Google remote revocation is unavailable', async () => {
