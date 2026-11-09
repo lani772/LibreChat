@@ -22,7 +22,9 @@ export interface ConnectorCredentialMethods {
     encryptedPayload: string;
     keyVersion: 'gcm1';
   }): Promise<ConnectorCredentialSummary>;
-  getConnectorCredentialCiphertext(installationId: string): Promise<ConnectorCredentialCiphertext | null>;
+  getConnectorCredentialCiphertext(
+    installationId: string,
+  ): Promise<ConnectorCredentialCiphertext | null>;
   deleteConnectorCredential(installationId: string): Promise<{ deleted: boolean }>;
 }
 
@@ -70,7 +72,11 @@ export function createConnectorCredentialMethods(
         },
       },
       { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
-    ).select('installationId provider updatedAt').lean<ConnectorCredentialDocument>().exec();
+    )
+      .select('installationId provider updatedAt')
+      .lean<ConnectorCredentialDocument>()
+      .exec();
+    if (!row) throw new Error('Unable to persist connector credential metadata');
     return {
       installationId: row.installationId,
       provider: row.provider,
