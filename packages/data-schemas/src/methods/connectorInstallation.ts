@@ -82,7 +82,6 @@ export function createConnectorInstallationMethods(
   ): Promise<ConnectorInstallationDocument | null> {
     if (!mongoose.isValidObjectId(installationId)) return null;
     return Model.findById(installationId)
-      .select('+credentialRef')
       .lean<ConnectorInstallationDocument>()
       .exec();
   }
