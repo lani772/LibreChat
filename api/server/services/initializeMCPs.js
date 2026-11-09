@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { logger } = require('@librechat/data-schemas');
+const { logger, tenantStorage } = require('@librechat/data-schemas');
 const { resolveMCPAppsPolicy } = require('librechat-data-provider');
 const {
   registerShutdownTask,
@@ -12,6 +12,10 @@ const {
   createMCPPolicyResolver,
   ConnectorService,
   ConnectorCredentialVault,
+  GoogleWorkspaceOAuthAdapter,
+  GoogleWorkspaceOAuthFlow,
+  encryptGoogleOAuthVerifier,
+  decryptGoogleOAuthVerifier,
   createConnectorAuditWriter,
   createConnectorMCPAuthorizationGuard,
   createTenantConnectorPermissionResolver,
@@ -29,6 +33,7 @@ const { createMCPServersRegistry, createMCPManager } = require('~/config');
 const db = require('~/models');
 
 let connectorCredentialVault;
+let googleWorkspaceOAuthFlow;
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -155,6 +160,72 @@ async function initializeMCPs() {
       connectorService,
     );
 
+    const googleScopes = (process.env.GOOGLE_WORKSPACE_SCOPES || '')
+      .split(/[ ,]+/)
+      .map((scope) => scope.trim())
+      .filter(Boolean);
+    if (
+      process.env.GOOGLE_WORKSPACE_CLIENT_ID &&
+      process.env.GOOGLE_WORKSPACE_CLIENT_SECRET &&
+      process.env.GOOGLE_WORKSPACE_REDIRECT_URI &&
+      googleScopes.length > 0
+    ) {
+      const adapter = new GoogleWorkspaceOAuthAdapter({
+        clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
+      });
+      googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
+        adapter,
+        vault: connectorCredentialVault,
+        installations: {
+          getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
+          transitionConnectorInstallation: (input) =>
+            db.transitionConnectorInstallation(input),
+        },
+        states: {
+          create: async (pending) => {
+            const context = {
+              stateHash: pending.stateHash,
+              tenantId: pending.tenantId,
+              principalId: pending.principalId,
+              installationId: pending.installationId,
+            };
+            await db.createGoogleOAuthState({
+              ...pending,
+              encryptedCodeVerifier: encryptGoogleOAuthVerifier(pending.codeVerifier, context),
+            });
+          },
+          consume: async (stateHash) => {
+            const pending = await db.consumeGoogleOAuthState(stateHash);
+            if (!pending) return null;
+            const context = {
+              stateHash: pending.stateHash,
+              tenantId: pending.tenantId,
+              principalId: pending.principalId,
+              installationId: pending.installationId,
+            };
+            const { encryptedCodeVerifier, ...safePending } = pending;
+            return {
+              ...safePending,
+              codeVerifier: decryptGoogleOAuthVerifier(encryptedCodeVerifier, context),
+            };
+          },
+        },
+        runWithIdentity: (identity, operation) => {
+          const current = tenantStorage.getStore() || {};
+          return tenantStorage.run(
+            { ...current, tenantId: identity.tenantId, userId: identity.principalId },
+            async () => operation(),
+          );
+        },
+        clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
+        redirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI,
+        scopes: googleScopes,
+      });
+    } else {
+      googleWorkspaceOAuthFlow = undefined;
+    }
+
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
       findInstallationByMCPServerId: (mcpServerId) =>
         db.getConnectorInstallationBindingByMCPServerId(mcpServerId),
@@ -206,4 +277,5 @@ async function initializeMCPs() {
 
 module.exports = initializeMCPs;
 module.exports.getConnectorCredentialVault = () => connectorCredentialVault;
+module.exports.getGoogleWorkspaceOAuthFlow = () => googleWorkspaceOAuthFlow;
 module.exports.refreshChangedServerTools = refreshChangedServerTools;
