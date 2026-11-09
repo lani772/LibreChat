@@ -154,7 +154,7 @@ export class GoogleWorkspaceOAuthFlow {
   }
 
   async complete(input: { state: string; code: string }): Promise<{ installationId: string; connected: true }> {
-    if (!STATE_PATTERN.test(input.state) || !input.code?.trim()) {
+    if (!STATE_PATTERN.test(input.state) || !input.code?.trim() || input.code.length > 4096) {
       throw new Error('Invalid Google OAuth callback');
     }
     const pending = await this.deps.states.consume(sha256(input.state));
