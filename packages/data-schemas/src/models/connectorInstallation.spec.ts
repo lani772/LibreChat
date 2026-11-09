@@ -120,6 +120,40 @@ describe('connector installation persistence', () => {
     ).rejects.toThrow('Invalid connector state transition');
   });
 
+  it('refuses unscoped creation even when global tenant strict mode is disabled', async () => {
+    await expect(
+      methods().createConnectorInstallation({
+        ownerUserId: 'user-a',
+        provider: 'google-workspace',
+        displayName: 'Google Workspace',
+        visibility: 'personal',
+      }),
+    ).rejects.toThrow('requires an active tenant context');
+  });
+
+  it('revokes an installation and removes its credential reference', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a' }, () =>
+      methods().createConnectorInstallation({
+        ownerUserId: 'user-a',
+        provider: 'chatwoot',
+        displayName: 'Support',
+        visibility: 'personal',
+        credentialRef: 'vault-ref-456',
+      }),
+    );
+    const revoked = await tenantStorage.run({ tenantId: 'tenant-a' }, () =>
+      methods().revokeConnectorInstallation(String(created._id)),
+    );
+    expect(revoked).toBe(true);
+    const stored = await tenantStorage.run({ tenantId: 'tenant-a' }, () =>
+      mongoose.models.ConnectorInstallation.findById(created._id)
+        .select('+credentialRef')
+        .lean(),
+    );
+    expect(stored?.state).toBe('revoked');
+    expect(stored?.credentialRef).toBeNull();
+  });
+
   it('requires a tenant context when strict isolation is enabled', async () => {
     const previous = process.env.TENANT_ISOLATION_STRICT;
     process.env.TENANT_ISOLATION_STRICT = 'true';
@@ -127,7 +161,7 @@ describe('connector installation persistence', () => {
     try {
       await expect(
         methods().listConnectorInstallations(),
-      ).rejects.toThrow('without tenant context');
+      ).rejects.toThrow('requires an active tenant context');
     } finally {
       if (previous == null) delete process.env.TENANT_ISOLATION_STRICT;
       else process.env.TENANT_ISOLATION_STRICT = previous;
