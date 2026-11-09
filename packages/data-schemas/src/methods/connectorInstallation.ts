@@ -72,6 +72,7 @@ export function createConnectorInstallationMethods(
 ): ConnectorInstallationMethods {
   const Model = mongoose.models.ConnectorInstallation as Model<ConnectorInstallationDocument>;
   const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
+  const Credential = mongoose.models.ConnectorCredential as Model<import('~/types/connectorCredential').ConnectorCredentialDocument>;
 
   async function createConnectorInstallation(
     input: CreateConnectorInstallationInput,
@@ -256,6 +257,11 @@ export function createConnectorInstallationMethods(
       { _id: installationId, state: { $ne: 'revoked' } },
       { $set: { state: 'revoked', credentialRef: null }, $inc: { version: 1 } },
     ).exec();
+    if (result.modifiedCount === 1) {
+      // Authorization is revoked before ciphertext cleanup. If cleanup fails, the
+      // installation remains unusable and an operator can safely retry cleanup.
+      await Credential.deleteOne({ installationId }).exec();
+    }
     return result.modifiedCount === 1;
   }
 
