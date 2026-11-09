@@ -109,11 +109,14 @@ export class GoogleWorkspaceOAuthFlow {
       codeVerifier: verifier,
       expiresAt,
     });
-    await this.deps.installations.transitionConnectorInstallation({
+    const transition = await this.deps.installations.transitionConnectorInstallation({
       installationId,
       expectedVersion: installation.version,
       state: 'authorizing',
     });
+    if (!transition) {
+      throw new Error('Google Workspace connector changed; restart authorization');
+    }
     const url = new URL(GOOGLE_AUTHORIZE_ENDPOINT);
     url.search = new URLSearchParams({
       client_id: this.deps.clientId,
