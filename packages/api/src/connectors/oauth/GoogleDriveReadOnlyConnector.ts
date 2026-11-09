@@ -125,7 +125,7 @@ export class GoogleDriveReadOnlyConnector {
       const url = new URL(`${DRIVE_API}/files`);
       url.searchParams.set('pageSize', String(pageSize));
       url.searchParams.set('fields', FILE_FIELDS);
-      url.searchParams.set('q', query || 'trashed = false');
+      url.searchParams.set('q', query ? `trashed = false and (${query})` : 'trashed = false');
       url.searchParams.set('orderBy', input.orderBy ?? 'modifiedTime desc');
       if (input.pageToken) url.searchParams.set('pageToken', input.pageToken);
       return this.request<GoogleDriveListResult>(url, accessToken, (body) => {
