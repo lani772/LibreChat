@@ -6,3 +6,4 @@ export * from './credentialCrypto';
 export * from './ConnectorCredentialVault';
 export * from './oauth/types';
 export * from './oauth/GoogleWorkspaceOAuthAdapter';
+export * from './oauth/GoogleWorkspaceOAuthFlow';
