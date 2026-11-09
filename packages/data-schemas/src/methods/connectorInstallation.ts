@@ -25,6 +25,14 @@ export interface ConnectorInstallationMethods {
   getConnectorInstallation(
     installationId: string,
   ): Promise<ConnectorInstallationDocument | null>;
+  getConnectorInstallationByMCPServerId(
+    mcpServerId: string,
+  ): Promise<ConnectorInstallationDocument | null>;
+  bindConnectorInstallationToMCPServer(params: {
+    installationId: string;
+    mcpServerId: string;
+    expectedVersion: number;
+  }): Promise<ConnectorInstallationDocument | null>;
   listConnectorInstallations(options?: {
     ownerUserId?: string;
     provider?: string;
@@ -58,6 +66,7 @@ export function createConnectorInstallationMethods(
   mongoose: typeof import('mongoose'),
 ): ConnectorInstallationMethods {
   const Model = mongoose.models.ConnectorInstallation as Model<ConnectorInstallationDocument>;
+  const MCPServer = mongoose.models.MCPServer as Model<import('~/types').MCPServerDocument>;
 
   async function createConnectorInstallation(
     input: CreateConnectorInstallationInput,
@@ -101,6 +110,52 @@ export function createConnectorInstallationMethods(
     requireConnectorTenant('read');
     if (!mongoose.isValidObjectId(installationId)) return null;
     return Model.findById(installationId)
+      .lean<ConnectorInstallationDocument>()
+      .exec();
+  }
+
+  async function getConnectorInstallationByMCPServerId(
+    mcpServerId: string,
+  ): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('MCP server binding lookup');
+    if (!mongoose.isValidObjectId(mcpServerId)) return null;
+    return Model.findOne({ mcpServerId })
+      .select('-credentialRef')
+      .lean<ConnectorInstallationDocument>()
+      .exec();
+  }
+
+  /** Bind only an MCP server record authored by the authenticated connector owner. */
+  async function bindConnectorInstallationToMCPServer(params: {
+    installationId: string;
+    mcpServerId: string;
+    expectedVersion: number;
+  }): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('MCP server binding');
+    const principalId = getUserId();
+    if (!principalId || !mongoose.isValidObjectId(params.installationId) || !mongoose.isValidObjectId(params.mcpServerId)) {
+      return null;
+    }
+    if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
+      throw new Error('Invalid connector installation version');
+    }
+    const server = await MCPServer.findById(params.mcpServerId)
+      .select('author')
+      .lean<{ author: { toString(): string } }>()
+      .exec();
+    if (!server || server.author?.toString() !== principalId) return null;
+
+    return Model.findOneAndUpdate(
+      {
+        _id: params.installationId,
+        ownerUserId: principalId,
+        state: { $ne: 'revoked' },
+        version: params.expectedVersion,
+      },
+      { $set: { mcpServerId: params.mcpServerId }, $inc: { version: 1 } },
+      { new: true, runValidators: true },
+    )
+      .select('-credentialRef')
       .lean<ConnectorInstallationDocument>()
       .exec();
   }
@@ -213,6 +268,8 @@ export function createConnectorInstallationMethods(
   return {
     createConnectorInstallation,
     getConnectorInstallation,
+    getConnectorInstallationByMCPServerId,
+    bindConnectorInstallationToMCPServer,
     listConnectorInstallations,
     transitionConnectorInstallation,
     revokeConnectorInstallation,
