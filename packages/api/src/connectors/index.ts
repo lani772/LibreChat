@@ -9,3 +9,4 @@ export * from './oauth/GoogleWorkspaceOAuthAdapter';
 export * from './oauth/GoogleWorkspaceOAuthFlow';
 export * from './oauth/stateCrypto';
 export * from './oauth/GoogleWorkspaceTokenLifecycle';
+export * from './oauth/GoogleDriveReadOnlyConnector';
