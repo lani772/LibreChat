@@ -203,9 +203,9 @@ The token adapter and orchestration flow are wired to authenticated HTTP initiat
 - [x] Re-check installation tenant, owner, provider, and revocation status before exchanging the authorization code.
 - [x] Persist access/refresh tokens only through ConnectorCredentialVault and mark the installation connected with version-checked transition.
 - [x] Add unit tests for state creation/hash-only storage, ownership denial, PKCE exchange, encrypted vault handoff, replay rejection, revoked installation, and malformed callback input.
-- [x] Implement the durable MongoDB state collection with a unique state-hash index, encrypted PKCE verifier, TTL cleanup, and atomic find-and-delete consume.
-- [x] Wire authenticated same-origin POST initiation and public callback routes with fixed redirect URI, rate limiting, and state-consuming provider cancellation. Browser UI/status presentation remains outstanding.
+- [x] Implement the durable MongoDB state collection with a unique state-hash index, encrypted PKCE verifier bound to tenant/principal/installation/redirect/expiry metadata, TTL cleanup, and atomic find-and-delete consume.
+- [x] Wire authenticated same-origin POST initiation, a public callback, and an owner-only safe status endpoint; apply rate limiting, fixed redirect URI, and state-consuming provider cancellation. Frontend connection UI/status presentation remains outstanding.
 - [ ] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
 - [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
 
-The orchestration service is wired to the production MongoDB state store, independent PKCE-verifier encryption key, and tenant AsyncLocalStorage context runner. HTTP routes are mounted; the frontend connection UI is not yet implemented. Tests are authored but not executed.
+The orchestration service is wired to the production MongoDB state store, startup-enforced unique/TTL indexes (including when automatic index creation is disabled), independent PKCE-verifier encryption key, and tenant AsyncLocalStorage context runner. HTTP routes are mounted; the frontend connection UI is not yet implemented. Google OAuth remains disabled unless client credentials, a fixed HTTPS callback, explicit scopes, and both independent encryption keys are configured. Tests are authored but not executed.
