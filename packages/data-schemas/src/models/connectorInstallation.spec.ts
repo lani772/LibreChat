@@ -112,6 +112,16 @@ describe('connector installation persistence', () => {
     expect(resolved?._id.toString()).toBe(String(installation._id));
     expect(resolved?.credentialRef).toBeUndefined();
 
+    // The MCP guard must still recognize a connector binding from a different tenant context.
+    // It receives only the opaque installation ID; ConnectorService performs the actual
+    // tenant comparison and denies the cross-tenant invocation.
+    const crossTenantBinding = await tenantStorage.run(
+      { tenantId: 'tenant-b', userId: otherOwnerId.toString() },
+      async () =>
+        methods().getConnectorInstallationBindingByMCPServerId(String(ownedServer._id)),
+    );
+    expect(crossTenantBinding?._id.toString()).toBe(String(installation._id));
+
     await expect(
       tenantStorage.run(
         { tenantId: 'tenant-a', userId: ownerId.toString() },
