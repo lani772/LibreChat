@@ -8,6 +8,7 @@ export interface ConnectorCredentialDocument {
   provider: string;
   /** AES-256-GCM envelope; ciphertext only, never plaintext. */
   encryptedPayload: string;
+  /** Envelope format version; the active encryption key is deployment-managed. */
   keyVersion: 'gcm1';
   createdAt: Date;
   updatedAt: Date;
