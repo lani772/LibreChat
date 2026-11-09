@@ -19,6 +19,7 @@ export * from './auth';
 export * from './apiKeys';
 /* Connectors */
 export * from './connectors';
+export * from './connectors/ConnectorService';
 /* MCP */
 export * from './mcp/mcpConfig';
 export * from './mcp/capabilities';
