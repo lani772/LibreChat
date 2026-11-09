@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { Model } from 'mongoose';
-import { getTenantId, SYSTEM_TENANT_ID } from '~/config/tenantContext';
+import { getTenantId, getUserId, SYSTEM_TENANT_ID } from '~/config/tenantContext';
 import type {
   ConnectorInstallationDocument,
   ConnectorInstallationState,
@@ -58,13 +58,14 @@ export function createConnectorInstallationMethods(
     input: CreateConnectorInstallationInput,
   ): Promise<ConnectorInstallationDocument> {
     requireConnectorTenant('create');
+    const ownerUserId = getUserId();
+    if (!ownerUserId) {
+      throw new Error('Connector creation requires an authenticated user context');
+    }
     const provider = input.provider.trim().toLowerCase();
     const displayName = input.displayName.trim();
     if (!PROVIDER_PATTERN.test(provider)) {
       throw new Error('Invalid connector provider identifier');
-    }
-    if (!input.ownerUserId.trim()) {
-      throw new Error('Connector owner is required');
     }
     if (!displayName || displayName.length > 120) {
       throw new Error('Connector display name must contain 1–120 characters');
@@ -74,7 +75,7 @@ export function createConnectorInstallationMethods(
     }
 
     const created = await Model.create({
-      ownerUserId: input.ownerUserId,
+      ownerUserId,
       provider,
       instanceKey: nanoid(24),
       displayName,
@@ -84,7 +85,9 @@ export function createConnectorInstallationMethods(
       grantedPrincipalIds: [],
       version: 0,
     });
-    return created.toObject() as ConnectorInstallationDocument;
+    const record = created.toObject();
+    delete record.credentialRef;
+    return record as ConnectorInstallationDocument;
   }
 
   async function getConnectorInstallation(
