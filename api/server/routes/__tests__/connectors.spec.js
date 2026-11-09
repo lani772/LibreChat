@@ -110,7 +110,8 @@ describe('Google Workspace connector routes', () => {
     expect(response.status).toBe(400);
     expect(db.createConnectorInstallation).not.toHaveBeenCalled();
   });
-\n  it('starts authorization using trusted tenant and principal context', async () => {
+
+  it('starts authorization using trusted tenant and principal context', async () => {
     const flow = {
       begin: jest.fn().mockResolvedValue({
         authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque',
