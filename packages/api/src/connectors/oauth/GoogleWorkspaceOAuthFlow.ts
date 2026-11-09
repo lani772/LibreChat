@@ -166,11 +166,14 @@ export class GoogleWorkspaceOAuthFlow {
           scopes: tokens.scopes,
           tokenType: tokens.tokenType,
         });
-        await this.deps.installations.transitionConnectorInstallation({
+        const connected = await this.deps.installations.transitionConnectorInstallation({
           installationId: pending.installationId,
           expectedVersion: installation.version,
           state: 'connected',
         });
+        if (!connected) {
+          throw new Error('Google Workspace connector changed during authorization; reconnect');
+        }
         return { installationId: pending.installationId, connected: true as const };
       });
     } catch (error) {
