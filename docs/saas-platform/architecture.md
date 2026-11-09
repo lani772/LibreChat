@@ -187,12 +187,12 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [x] Add a Google Workspace token-endpoint adapter using fixed Google endpoints, bounded requests, PKCE verifier forwarding, offline refresh-token requirement on initial exchange, and redacted provider errors.
 - [x] Add focused adapter tests for exchange, missing refresh token, refresh without token rotation, safe errors, idempotent revocation, and missing configuration.
 - [x] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
-- [x] Connect the authorization-code exchange to ConnectorCredentialVault so initial credentials are encrypted and persisted without exposing tokens; refresh-token rotation remains outstanding.
+- [x] Connect authorization-code exchange and subsequent token refresh/rotation to ConnectorCredentialVault; never expose tokens to the model or ordinary API responses.
 - [ ] Define least-privilege Google Workspace scopes and implement the first read-only provider API tool.
 - [x] Add just-in-time refresh coordination, remote revocation orchestration, and local disconnect lifecycle handling.
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
-The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. The first provider API tool, refresh scheduling, remote revocation, and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
+The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. Just-in-time refresh, refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect are implemented. The first provider API tool, frontend connection UI, scheduled background refresh, and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
 
 
 ### Google Workspace OAuth orchestration — implementation progress
