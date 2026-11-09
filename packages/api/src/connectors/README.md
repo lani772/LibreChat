@@ -53,3 +53,27 @@ Google commonly omits `refresh_token` from refresh responses. In that case, the 
 The owner-only, authenticated, same-origin disconnect endpoint is `DELETE /api/connectors/google-workspace/:installationId/disconnect`. It attempts Google remote revocation using the refresh token (or access token as a fallback), then revokes the local installation and deletes the encrypted credential row. Local access is disabled even when Google's revocation endpoint is unavailable; the response distinguishes `remoteRevocation: confirmed` from `pending`. Repeated local disconnect requests are safe and can retry encrypted-row cleanup after an earlier cleanup failure. A pending remote revocation means the provider token may remain valid until Google invalidates it or it expires; local connector access is nevertheless blocked.
 
 Focused tests are authored for token refresh, refresh-token preservation, cross-process lease contention, stale-lease write fencing, invalid-grant handling, remote revocation failure, and owner-only disconnect routes. They have not been executed in a dependency-enabled checkout.
+
+
+## Google Drive read-only metadata connector
+
+`GoogleDriveReadOnlyConnector` is the first provider API adapter. It uses the existing `ConnectorService`, `ConnectorCredentialVault`, and `GoogleWorkspaceTokenLifecycle`; it does not create a second token store or accept caller-supplied tenant/principal identities. Each request is authorized and audited before scope inspection, token retrieval, or Google API dispatch. Token refresh remains just-in-time and uses the existing distributed refresh lease.
+
+The connector supports only:
+- List/search Drive files with the Drive `files.list` endpoint.
+- Retrieve metadata for one file with `files.get`.
+
+It requests only metadata fields (ID, name, MIME type, modification time, size, web/icon links, parents, and trashed flag). It does not expose file download, export, upload, update, delete, or permission mutation operations. Requests use GET, a fixed Google API origin, a ten-second timeout, a maximum page size of 100, bounded query/page-token lengths, and safe provider errors. Search always excludes trashed files. Returned records are allowlisted rather than passing arbitrary Google response properties to callers.
+
+The exact least-privilege OAuth scope is:
+`https://www.googleapis.com/auth/drive.metadata.readonly`
+
+Add this scope to `GOOGLE_WORKSPACE_SCOPES` before authorizing Drive access. The adapter checks the actual granted scope stored with the encrypted credentials on every operation; a configured scope alone is not treated as proof of consent. If the existing connection lacks it, reconnect and grant the additional scope. Avoid broad scopes such as `drive` or `drive.readonly` for this metadata-only milestone.
+
+Authenticated API routes (mounted under `/api/connectors`):
+- `GET /google-workspace/:installationId/drive/files?q=...&pageSize=...&pageToken=...`
+- `GET /google-workspace/:installationId/drive/files/:fileId`
+
+Both routes return metadata only and set no-store headers. The connector service performs tenant, membership, installation-state, owner/grant, and tenant-shared role checks; failures do not reach Google. These are HTTP API endpoints for the application layer; they are not yet registered as model-callable MCP/Agent tools, and no Drive file content is returned.
+
+Focused tests cover listing, metadata retrieval, scope denial, authorization-before-provider-call, pagination validation, safe provider errors, and HTTP route behavior. Tests are authored but have not been executed in a dependency-enabled checkout.
