@@ -209,3 +209,18 @@ The token adapter and orchestration flow are wired to authenticated HTTP initiat
 - [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
 
 The orchestration service is wired to the production MongoDB state store, startup-enforced unique/TTL indexes (including when automatic index creation is disabled), independent PKCE-verifier encryption key, and tenant AsyncLocalStorage context runner. The authenticated start route is `POST /api/connectors/google-workspace/:installationId/authorize`; the public callback is `GET /api/connectors/google-workspace/callback`; the owner-only safe status route is `GET /api/connectors/google-workspace/:installationId/status`. The configured `GOOGLE_WORKSPACE_REDIRECT_URI` must exactly match the callback URL. HTTP routes are mounted; the frontend connection UI is not yet implemented. Google OAuth remains disabled unless client credentials, a fixed HTTPS callback, explicit scopes, and both independent encryption keys are configured. Tests are authored but not executed.
+
+
+### Google Workspace token lifecycle and disconnect — implementation progress
+
+- [x] Add MongoDB-backed cross-process refresh leases with compare-and-set acquisition and lease-token fencing on credential writes.
+- [x] Refresh access tokens just in time with a two-minute expiry safety window and bounded contention retries.
+- [x] Preserve the existing refresh token when Google omits a replacement; persist rotated refresh tokens atomically with the new access token.
+- [x] Classify safe `invalid_grant` responses and mark the installation `error` with `google_reauthorization_required` without exposing provider response bodies.
+- [x] Add owner-only, JWT-authenticated, same-origin disconnect endpoint; attempt Google remote revocation and always revoke local connector access.
+- [x] Make local revocation and encrypted credential cleanup retryable; report whether remote revocation was confirmed or remains pending.
+- [x] Add tests for token refresh, refresh-token preservation, lease contention, stale-lease fencing, invalid grants, remote revocation failure, and disconnect authorization.
+- [ ] Run the focused Jest suites, data-schema package tests, typechecks, lint, and integration tests in a configured checkout.
+- [ ] Implement Google Workspace API read-only tools, user-facing connection UI, and production KMS/HSM key management.
+
+The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. This milestone does not yet implement Google Drive/Gmail API tools or a frontend connection interface.
