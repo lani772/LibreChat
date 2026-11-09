@@ -138,6 +138,7 @@ jest.mock('~/models', () => ({
   deleteTokens: jest.fn(),
   findPluginAuthsByKeys: jest.fn(),
   getRoleByName: jest.fn(),
+  getConnectorInstallation: jest.fn(),
   recordAuditEntry: jest.fn(),
 }));
 
@@ -385,6 +386,47 @@ describe('MCP Routes', () => {
 
       expect(response.status).toBe(400);
       expect(flow.begin).not.toHaveBeenCalled();
+    });
+
+    it('returns safe status only to the owning user in the active tenant', async () => {
+      getTenantId.mockReturnValue('tenant-a');
+      const db = require('~/models');
+      db.getConnectorInstallation.mockResolvedValue({
+        tenantId: 'tenant-a',
+        ownerUserId: 'test-user-id',
+        provider: 'google-workspace',
+        displayName: 'Workspace',
+        state: 'connected',
+        lastConnectedAt: new Date('2026-11-09T20:00:00.000Z'),
+        lastErrorCode: undefined,
+        version: 4,
+        credentialRef: 'must-not-leak',
+      });
+
+      const response = await request(app)
+        .get('/api/mcp/connectors/google/507f1f77bcf86cd799439011/status');
+
+      expect(response.status).toBe(200);
+      expect(response.body.state).toBe('connected');
+      expect(response.body).not.toHaveProperty('credentialRef');
+      expect(JSON.stringify(response.body)).not.toContain('must-not-leak');
+    });
+
+    it('hides connector status from a different owner or tenant', async () => {
+      getTenantId.mockReturnValue('tenant-a');
+      const db = require('~/models');
+      db.getConnectorInstallation.mockResolvedValue({
+        tenantId: 'tenant-b',
+        ownerUserId: 'other-user',
+        provider: 'google-workspace',
+        state: 'connected',
+      });
+
+      const response = await request(app)
+        .get('/api/mcp/connectors/google/507f1f77bcf86cd799439011/status');
+
+      expect(response.status).toBe(404);
+      expect(response.body).not.toHaveProperty('state');
     });
 
     it('completes the callback using the one-time state transaction', async () => {
