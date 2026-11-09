@@ -16,11 +16,14 @@ export interface ConnectorCredentialStore {
     provider: string;
     encryptedPayload: string;
     keyVersion: 'gcm1';
+    refreshLeaseToken?: string;
   }): Promise<ConnectorCredentialSummary>;
   getConnectorCredentialCiphertext(
     installationId: string,
   ): Promise<ConnectorCredentialCiphertext | null>;
   deleteConnectorCredential(installationId: string): Promise<{ deleted: boolean }>;
+  claimConnectorCredentialRefresh(input: { installationId: string; leaseToken: string; leaseUntil: Date }): Promise<boolean>;
+  releaseConnectorCredentialRefresh(input: { installationId: string; leaseToken: string }): Promise<boolean>;
 }
 
 export type ConnectorCredentialValues = Record<string, unknown>;
@@ -41,6 +44,7 @@ export class ConnectorCredentialVault {
     installationId: string,
     provider: string,
     values: ConnectorCredentialValues,
+    options: { refreshLeaseToken?: string } = {},
   ): Promise<ConnectorCredentialSummary> {
     if (!values || typeof values !== 'object' || Array.isArray(values)) {
       throw new Error('Connector credentials must be a JSON object');
@@ -63,6 +67,7 @@ export class ConnectorCredentialVault {
       provider: provider.toLowerCase(),
       encryptedPayload: JSON.stringify(envelope),
       keyVersion: envelope.version,
+      ...(options.refreshLeaseToken ? { refreshLeaseToken: options.refreshLeaseToken } : {}),
     });
   }
 
@@ -98,6 +103,21 @@ export class ConnectorCredentialVault {
       }
       return operation(credentials as ConnectorCredentialValues);
     });
+  }
+
+  async claimRefreshLease(installationId: string, leaseToken: string, leaseMs: number): Promise<boolean> {
+    if (!Number.isInteger(leaseMs) || leaseMs < 5_000 || leaseMs > 120_000) {
+      throw new Error('Invalid connector credential refresh lease duration');
+    }
+    return this.store.claimConnectorCredentialRefresh({
+      installationId,
+      leaseToken,
+      leaseUntil: new Date(Date.now() + leaseMs),
+    });
+  }
+
+  async releaseRefreshLease(installationId: string, leaseToken: string): Promise<boolean> {
+    return this.store.releaseConnectorCredentialRefresh({ installationId, leaseToken });
   }
 
   async deleteCredentials(installationId: string): Promise<{ deleted: boolean }> {
