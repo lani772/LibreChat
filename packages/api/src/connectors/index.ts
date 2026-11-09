@@ -8,3 +8,4 @@ export * from './oauth/types';
 export * from './oauth/GoogleWorkspaceOAuthAdapter';
 export * from './oauth/GoogleWorkspaceOAuthFlow';
 export * from './oauth/stateCrypto';
+export * from './oauth/GoogleWorkspaceTokenLifecycle';
