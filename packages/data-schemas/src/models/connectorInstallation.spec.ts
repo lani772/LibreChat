@@ -1,7 +1,8 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { tenantStorage } from '~/config/tenantContext';
 import { createConnectorInstallationModel } from './connectorInstallation';
+import { _resetStrictCache } from './plugins/tenantIsolation';
 import { createConnectorInstallationMethods } from '~/methods/connectorInstallation';
 
 let mongoServer: InstanceType<typeof MongoMemoryServer>;
@@ -122,6 +123,7 @@ describe('connector installation persistence', () => {
   it('requires a tenant context when strict isolation is enabled', async () => {
     const previous = process.env.TENANT_ISOLATION_STRICT;
     process.env.TENANT_ISOLATION_STRICT = 'true';
+    _resetStrictCache();
     try {
       await expect(
         methods().listConnectorInstallations(),
@@ -129,6 +131,7 @@ describe('connector installation persistence', () => {
     } finally {
       if (previous == null) delete process.env.TENANT_ISOLATION_STRICT;
       else process.env.TENANT_ISOLATION_STRICT = previous;
+      _resetStrictCache();
     }
   });
 });
