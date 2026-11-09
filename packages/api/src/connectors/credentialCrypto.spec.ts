@@ -4,7 +4,7 @@ import {
 } from './credentialCrypto';
 
 describe('connector credential authenticated encryption', () => {
-  const originalKey = process.env.CONNECTOR_CREDENTIALS_KEY;
+  const originalKey = process.env.CONNECTOR_CREDENTIALS_KEY;\n  const originalKeyring = process.env.CONNECTOR_CREDENTIALS_KEYRING;\n  const originalActiveKeyId = process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
   const context = {
     tenantId: 'tenant-a',
     installationId: '64b000000000000000000001',
@@ -67,7 +67,44 @@ describe('connector credential authenticated encryption', () => {
     );
   });
 
-  it('rejects payloads larger than 64 KiB', () => {
+
+  it('encrypts with the configured active key ID and decrypts with a retained previous key', () => {
+    process.env.CONNECTOR_CREDENTIALS_KEYRING = JSON.stringify({
+      '2026-10': '33'.repeat(32),
+      '2026-11': '44'.repeat(32),
+    });
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = '2026-11';
+    const envelope = encryptConnectorCredential('rotated-secret', context);
+    expect(envelope.keyId).toBe('2026-11');
+    expect(decryptConnectorCredential(envelope, context)).toBe('rotated-secret');
+
+    const previousEnvelope = (() => {
+      process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = '2026-10';
+      return encryptConnectorCredential('previous-secret', context);
+    })();
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = '2026-11';
+    expect(decryptConnectorCredential(previousEnvelope, context)).toBe('previous-secret');
+  });
+
+  it('continues to decrypt legacy envelopes while the legacy key is retained', () => {
+    const legacyEnvelope = encryptConnectorCredential('legacy-secret', context);
+    expect(legacyEnvelope.keyId).toBeUndefined();
+    process.env.CONNECTOR_CREDENTIALS_KEYRING = JSON.stringify({ active: '55'.repeat(32) });
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = 'active';
+    expect(decryptConnectorCredential(legacyEnvelope, context)).toBe('legacy-secret');
+  });
+
+  it('fails closed for unknown key IDs and invalid active key configuration', () => {
+    process.env.CONNECTOR_CREDENTIALS_KEYRING = JSON.stringify({ active: '66'.repeat(32) });
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = 'missing';
+    expect(() => encryptConnectorCredential('secret', context)).toThrow('ACTIVE_KEY_ID');
+
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = 'active';
+    const envelope = encryptConnectorCredential('secret', context);
+    expect(() => decryptConnectorCredential({ ...envelope, keyId: 'retired' }, context))
+      .toThrow('encryption key is unavailable');
+  });
+\n  it('rejects payloads larger than 64 KiB', () => {
     expect(() => encryptConnectorCredential('x'.repeat(65 * 1024), context)).toThrow('64 KiB');
   });
 });
