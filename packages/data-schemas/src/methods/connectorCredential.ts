@@ -50,27 +50,27 @@ export function createConnectorCredentialMethods(
     if (!/^[a-z][a-z0-9-]{1,63}$/.test(provider)) {
       throw new Error('Invalid connector credential provider');
     }
-    if (!ownerUserId) throw new Error('Credential write requires an authenticated owner');
+    if (!ownerUserId && !input.refreshLeaseToken) throw new Error('Credential write requires an authenticated owner');
     if (!mongoose.isValidObjectId(input.installationId)) throw new Error('Invalid installation ID');
     if (!input.encryptedPayload || input.encryptedPayload.length > 140_000) {
       throw new Error('Invalid encrypted connector credential payload');
     }
     const installation = await Installation.findOne({
       _id: input.installationId,
-      ownerUserId,
+      ...(input.refreshLeaseToken ? {} : { ownerUserId }),
       provider,
       state: { $ne: 'revoked' },
     }).select('_id provider').lean<{ _id: unknown; provider: string }>().exec();
     if (!installation) throw new Error('Connector installation is unavailable');
 
     const filter: Record<string, unknown> = input.refreshLeaseToken
-      ? { installationId: input.installationId, tenantId, ownerUserId, refreshLeaseToken: input.refreshLeaseToken }
+      ? { installationId: input.installationId, tenantId, refreshLeaseToken: input.refreshLeaseToken }
       : { installationId: input.installationId };
     const update: Record<string, unknown> = {
       $set: {
         tenantId,
         installationId: input.installationId,
-        ownerUserId,
+        ...(ownerUserId ? { ownerUserId } : {}),
         provider,
         encryptedPayload: input.encryptedPayload,
         keyVersion: input.keyVersion,
@@ -128,13 +128,12 @@ export function createConnectorCredentialMethods(
   }): Promise<boolean> {
     const tenantId = requireTenant();
     const ownerUserId = getUserId();
-    if (!ownerUserId || !mongoose.isValidObjectId(input.installationId) || !input.leaseToken) return false;
+    if (!mongoose.isValidObjectId(input.installationId) || !input.leaseToken) return false;
     const now = new Date();
     const result = await Credential.updateOne(
       {
         installationId: input.installationId,
         tenantId,
-        ownerUserId,
         $or: [
           { refreshLeaseUntil: { $exists: false } },
           { refreshLeaseUntil: null },
@@ -152,9 +151,9 @@ export function createConnectorCredentialMethods(
   }): Promise<boolean> {
     const tenantId = requireTenant();
     const ownerUserId = getUserId();
-    if (!ownerUserId || !mongoose.isValidObjectId(input.installationId)) return false;
+    if (!mongoose.isValidObjectId(input.installationId)) return false;
     const result = await Credential.updateOne(
-      { installationId: input.installationId, tenantId, ownerUserId, refreshLeaseToken: input.leaseToken },
+      { installationId: input.installationId, tenantId, refreshLeaseToken: input.leaseToken },
       { $unset: { refreshLeaseToken: 1, refreshLeaseUntil: 1 } },
     ).exec();
     return result.modifiedCount === 1;
