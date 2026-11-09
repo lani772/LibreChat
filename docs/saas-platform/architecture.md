@@ -250,6 +250,19 @@ No live Google OAuth test or local test execution has been performed. Tests are 
 - [x] Add tests for installation routes and tool account selection, routing, and error redaction.
 - [ ] Run the focused Jest suites, frontend tests, package typechecks, lint, and full regression suite in a dependency-enabled checkout.
 - [ ] Run a live Google OAuth + Drive read-only integration test using a dedicated authorized test account.
-- [ ] Add a durable remote-revocation retry/outbox for Google token revocation failures and KMS/HSM-backed key management before production onboarding.
+- [ ] Add a durable remote-revocation retry/outbox for Google token revocation failures.\n- [x] Add versioned multi-key credential encryption and legacy-envelope compatibility.\n- [ ] Add an automated, audited fleet-wide credential re-encryption job and KMS/HSM-backed key management before production onboarding.
 
 The connection UI and model-callable tool are committed to the feature branch. Tests remain authored but unexecuted; no live Google account test has been performed.
+
+
+### Connector credential key rotation progress
+
+- [x] Add key IDs to new AES-256-GCM credential envelopes.
+- [x] Support an active key plus retained previous keys through a bounded deployment keyring.
+- [x] Preserve decryption compatibility for existing envelopes without key IDs using the legacy key setting.
+- [x] Fail closed for malformed keyrings, unknown key IDs, missing keys, and authentication failures.
+- [ ] Implement and execute an audited fleet-wide re-encryption job before retiring the legacy key.
+- [ ] Integrate the deployment keyring with a KMS/HSM-backed secret manager.
+- [ ] Execute focused Jest, typecheck, lint, and full regression suites in a dependency-enabled checkout.
+
+The keyring code and tests are committed, but test execution has not been possible in this workflow. Multi-key support is not a substitute for KMS/HSM key custody or a completed re-encryption migration.
