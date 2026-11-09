@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { Model } from 'mongoose';
+import { getTenantId, SYSTEM_TENANT_ID } from '~/config/tenantContext';
 import type {
   ConnectorInstallationDocument,
   ConnectorInstallationState,
@@ -8,6 +9,14 @@ import type {
 
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const ERROR_CODE_PATTERN = /^[a-zA-Z0-9_.-]{1,80}$/;
+
+/** Connector installations are tenant-owned; never create or query them unscoped. */
+function requireConnectorTenant(operation: string): void {
+  const tenantId = getTenantId();
+  if (!tenantId || tenantId === SYSTEM_TENANT_ID) {
+    throw new Error(`Connector installation ${operation} requires an active tenant context`);
+  }
+}
 
 export interface ConnectorInstallationMethods {
   createConnectorInstallation(
