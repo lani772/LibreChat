@@ -1375,6 +1375,41 @@ describe('role-name-keyed operations stay in the caller tenant partition', () =>
     expect(mockCache.get).not.toHaveBeenCalled();
   });
 
+  it('backfills connector invocation defaults on existing tenant system roles only', async () => {
+    await Role.collection.insertMany([
+      {
+        name: SystemRoles.ADMIN,
+        tenantId: 'tenant-a',
+        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: true } },
+      },
+      {
+        name: SystemRoles.USER,
+        tenantId: 'tenant-a',
+        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: true } },
+      },
+      {
+        name: 'CUSTOM',
+        tenantId: 'tenant-a',
+        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: true } },
+      },
+    ]);
+
+    await inTenant('tenant-a', async () => {
+      const admin = await getPartitionRole(SystemRoles.ADMIN);
+      const user = await getPartitionRole(SystemRoles.USER);
+      const custom = await getPartitionRole('CUSTOM');
+      expect(
+        admin?.permissions[PermissionTypes.MCP_SERVERS]?.[Permissions.INVOKE_CONNECTORS],
+      ).toBe(true);
+      expect(
+        user?.permissions[PermissionTypes.MCP_SERVERS]?.[Permissions.INVOKE_CONNECTORS],
+      ).toBe(false);
+      expect(
+        custom?.permissions[PermissionTypes.MCP_SERVERS]?.[Permissions.INVOKE_CONNECTORS],
+      ).toBeUndefined();
+    });
+  });
+
   it("renames and migrates only the platform role and its members, leaving the tenant's", async () => {
     const ids = await seed();
     const platform = await getPartitionRole('editor');
