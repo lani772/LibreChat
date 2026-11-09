@@ -2,7 +2,10 @@ const { Router } = require('express');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
 const db = require('~/models');
 const { requireJwtAuth, requireSameOrigin, loginLimiter } = require('~/server/middleware');
-const { getGoogleWorkspaceOAuthFlow } = require('~/server/services/initializeMCPs');
+const {
+  getGoogleWorkspaceOAuthFlow,
+  getGoogleWorkspaceTokenLifecycle,
+} = require('~/server/services/initializeMCPs');
 
 const router = Router();
 
@@ -92,6 +95,51 @@ router.post(
     } catch {
       // Do not expose installation existence, ownership, state, or provider details.
       return res.status(404).json({ error: 'Connector authorization is unavailable' });
+    }
+  },
+);
+
+/**
+ * Disconnect is owner-only and same-origin. Local access is revoked even when
+ * Google's remote revocation endpoint is temporarily unavailable.
+ */
+router.delete(
+  '/google-workspace/:installationId/disconnect',
+  loginLimiter,
+  requireJwtAuth,
+  requireSameOrigin,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const tenantId = getTenantId();
+    const principalId = getUserId();
+    const { installationId } = req.params;
+    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+      return res.status(404).json({ error: 'Connector installation is unavailable' });
+    }
+    try {
+      const installation = await db.getConnectorInstallation(installationId);
+      if (
+        !installation ||
+        installation.tenantId !== tenantId ||
+        installation.ownerUserId !== principalId ||
+        installation.provider !== 'google-workspace'
+      ) {
+        return res.status(404).json({ error: 'Connector installation is unavailable' });
+      }
+      const lifecycle = getGoogleWorkspaceTokenLifecycle();
+      if (!lifecycle) {
+        return res.status(503).json({ error: 'Google Workspace disconnect is not configured' });
+      }
+      const result = await lifecycle.disconnect(installationId);
+      if (!result.disconnected) {
+        return res.status(409).json({ error: 'Connector could not be disconnected; retry safely' });
+      }
+      return res.status(200).json({
+        disconnected: true,
+        remoteRevocation: result.remoteRevocation,
+      });
+    } catch {
+      return res.status(500).json({ error: 'Unable to disconnect Google Workspace' });
     }
   },
 );
