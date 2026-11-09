@@ -48,7 +48,7 @@ export function createConnectorCredentialMethods(
     }
     if (!ownerUserId) throw new Error('Credential write requires an authenticated owner');
     if (!mongoose.isValidObjectId(input.installationId)) throw new Error('Invalid installation ID');
-    if (!input.encryptedPayload || input.encryptedPayload.length > 100_000) {
+    if (!input.encryptedPayload || input.encryptedPayload.length > 140_000) {
       throw new Error('Invalid encrypted connector credential payload');
     }
     const installation = await Installation.findOne({
