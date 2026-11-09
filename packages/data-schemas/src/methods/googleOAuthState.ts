@@ -60,7 +60,9 @@ export function createGoogleOAuthStateMethods(
       stateHash,
       expiresAt: { $gt: new Date() },
     })
-      .select('+encryptedCodeVerifier stateHash tenantId principalId installationId redirectUri expiresAt')
+      .select(
+        '+encryptedCodeVerifier stateHash tenantId principalId installationId redirectUri expiresAt',
+      )
       .lean<GoogleOAuthStateDocument>()
       .exec();
     if (!row) return null;
