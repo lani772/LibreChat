@@ -179,3 +179,17 @@ A milestone is complete only when code and tests demonstrate the behavior. At mi
 ## Verification notes
 
 GitHub Actions runs and commit status checks were not returned for the baseline commit during the initial check. No local test suite has yet been executed in this environment. Do not interpret missing CI records as a passing test result. Each implementation milestone must report exact commands, actual results, and any checks that could not run.
+
+
+## Implementation progress — provider OAuth foundation
+
+- [x] Define a provider-neutral OAuth lifecycle contract for authorization-code exchange, refresh, and revocation.
+- [x] Add a Google Workspace token-endpoint adapter using fixed Google endpoints, bounded requests, PKCE verifier forwarding, offline refresh-token requirement on initial exchange, and redacted provider errors.
+- [x] Add focused adapter tests for exchange, missing refresh token, refresh without token rotation, safe errors, idempotent revocation, and missing configuration.
+- [ ] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
+- [ ] Connect the adapter to the ConnectorCredentialVault so credentials are persisted immediately and refreshed credentials are atomically rotated without exposing tokens.
+- [ ] Define least-privilege Google Workspace scopes and implement the first read-only provider API tool.
+- [ ] Add scheduled/just-in-time refresh coordination, remote revocation orchestration, and disconnect/reconnect lifecycle handling.
+- [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
+
+The adapter is deliberately not wired to HTTP routes or provider tools yet. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
