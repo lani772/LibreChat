@@ -14,9 +14,13 @@ Use ConnectorService.execute(installationId, operation) at the provider/MCP exec
 
 The service returns a generic not-found-style access error to avoid connector enumeration. Audit records contain only tenant/principal/installation identifiers, provider, outcome, and a safe reason code. They must not contain tokens, credential references, QR payloads, message bodies, or tool arguments.
 
-## Current integration boundary
+## MCP runtime integration
 
-The service and durable audit adapter are implemented as injectable enforcement primitives, but they are NOT YET wired into LibreChat's global MCPManager, Agent tool registry, or provider-specific MCP execution paths. No production tenant-membership/role-permission adapter or credential vault is included in this milestone. Those paths support arbitrary MCP servers and use existing per-user OAuth/config resolution; applying this installation gate to every MCP server would incorrectly block non-connector MCP servers. The next integration step must classify connector-backed server targets and invoke this service only for those targets before discovery/execution, with provider-specific credential resolution still pending.
+The trusted binding guard is now injected into the existing MCPManager. It resolves connector installations only by the resolved MCP server record's dbId; model-supplied server names, tool arguments, and installation IDs are never used as binding keys. A connector-backed server is authorized before tool-catalog discovery, before connection checkout, and again immediately before every upstream tools/call (including retry paths). Lookup and authorization failures propagate or suppress discovery; they do not silently fall back to an unguarded connector call. Ordinary unbound MCP servers continue through the existing MCP path.
+
+The production membership adapter verifies the principal by reading the tenant-isolated User model under the active tenant context. Tenant-shared invocation is intentionally denied for now (canInvokeTenantConnector: false) because the current role schema does not yet define a dedicated connector-invocation permission. Personal connector owners and explicitly granted principals can proceed when tenant membership and connected state are verified. Do not change the shared-connector default to allow until a real role/permission is introduced and tested.
+
+This guard protects MCP discovery and execution. It does not yet provide the credential vault, provider-specific credential retrieval/revocation, or direct first-party provider execution adapters. Those remain separate implementation milestones.
 
 ## Credential handling
 
