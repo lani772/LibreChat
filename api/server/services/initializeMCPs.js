@@ -14,6 +14,7 @@ const {
   ConnectorCredentialVault,
   GoogleWorkspaceOAuthAdapter,
   GoogleWorkspaceOAuthFlow,
+  GoogleWorkspaceTokenLifecycle,
   encryptGoogleOAuthVerifier,
   decryptGoogleOAuthVerifier,
   createConnectorAuditWriter,
@@ -34,6 +35,7 @@ const db = require('~/models');
 
 let connectorCredentialVault;
 let googleWorkspaceOAuthFlow;
+let googleWorkspaceTokenLifecycle;
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -156,6 +158,8 @@ async function initializeMCPs() {
           db.getConnectorCredentialCiphertext(installationId),
         deleteConnectorCredential: (installationId) =>
           db.deleteConnectorCredential(installationId),
+        claimConnectorCredentialRefresh: (input) => db.claimConnectorCredentialRefresh(input),
+        releaseConnectorCredentialRefresh: (input) => db.releaseConnectorCredentialRefresh(input),
       },
       connectorService,
     );
@@ -232,14 +236,28 @@ async function initializeMCPs() {
           redirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI,
           scopes: googleScopes,
         });
+        googleWorkspaceTokenLifecycle = new GoogleWorkspaceTokenLifecycle({
+          adapter,
+          vault: connectorCredentialVault,
+          installations: {
+            getConnectorInstallation: (installationId) =>
+              db.getConnectorInstallation(installationId),
+            transitionConnectorInstallation: (input) =>
+              db.transitionConnectorInstallation(input),
+            revokeConnectorInstallation: (installationId) =>
+              db.revokeConnectorInstallation(installationId),
+          },
+        });
       } catch {
         googleWorkspaceOAuthFlow = undefined;
+        googleWorkspaceTokenLifecycle = undefined;
         logger.warn(
           '[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.',
         );
       }
     } else {
       googleWorkspaceOAuthFlow = undefined;
+      googleWorkspaceTokenLifecycle = undefined;
     }
 
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
@@ -294,4 +312,5 @@ async function initializeMCPs() {
 module.exports = initializeMCPs;
 module.exports.getConnectorCredentialVault = () => connectorCredentialVault;
 module.exports.getGoogleWorkspaceOAuthFlow = () => googleWorkspaceOAuthFlow;
+module.exports.getGoogleWorkspaceTokenLifecycle = () => googleWorkspaceTokenLifecycle;
 module.exports.refreshChangedServerTools = refreshChangedServerTools;
