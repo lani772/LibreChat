@@ -925,6 +925,69 @@ describe('MCPManager', () => {
     });
   });
 
+  describe('connector authorization boundary', () => {
+    it('denies a bound connector before checking out an MCP connection', async () => {
+      const guard = jest.fn().mockRejectedValue(new Error('connector denied'));
+      const manager = new MCPManager(undefined, undefined, undefined, guard);
+      const checkout = jest.spyOn(manager, 'getConnection');
+
+      await expect(
+        manager.callTool({
+          user: mockUser,
+          serverName,
+          serverConfig: { ...serverConfig, dbId: '507f1f77bcf86cd799439011', source: 'user' },
+          toolName: 'test_tool',
+          provider: 'openai',
+          flowManager: mockFlowManager,
+        }),
+      ).rejects.toThrow('connector denied');
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(guard).toHaveBeenCalledWith(
+        expect.objectContaining({ dbId: '507f1f77bcf86cd799439011' }),
+      );
+      expect(checkout).not.toHaveBeenCalled();
+    });
+
+    it('checks connector authorization before returning a discovered tool catalog', async () => {
+      const guard = jest.fn().mockRejectedValue(new Error('connector denied'));
+      const manager = new MCPManager(undefined, undefined, undefined, guard);
+      const config = {
+        ...serverConfig,
+        dbId: '507f1f77bcf86cd799439011',
+        source: 'user' as const,
+      };
+
+      await expect(
+        manager.getServerToolFunctionsSnapshot(userId, serverName, config),
+      ).resolves.toEqual({ tools: null });
+      expect(guard).toHaveBeenCalledWith(config);
+    });
+
+    it('keeps ordinary MCP execution available when the guard permits an unbound server', async () => {
+      const guard = jest.fn().mockResolvedValue(undefined);
+      const manager = new MCPManager(undefined, undefined, undefined, guard);
+      const connection = createConnection();
+      jest.spyOn(manager, 'getConnection').mockResolvedValue(connection);
+
+      await manager.callTool({
+        user: mockUser,
+        serverName,
+        serverConfig: { ...serverConfig, dbId: undefined },
+        toolName: 'test_tool',
+        provider: 'openai',
+        flowManager: mockFlowManager,
+      });
+
+      expect(guard).toHaveBeenCalled();
+      expect(connection.client.request).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'tools/call' }),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
   describe('callTool - scheduled authority boundary', () => {
     async function setupScheduled(stage: 'invoke' | 'resume' = 'invoke') {
       const fixture = await executionFixture(stage);
