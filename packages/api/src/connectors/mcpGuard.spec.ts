@@ -27,7 +27,7 @@ describe('createConnectorMCPAuthorizationGuard', () => {
   });
 
   it('authorizes using the installation linked to the trusted MCP database ID', async () => {
-    const installation = { _id: { toString: () => 'installation-id' } } as Pick<
+    const installation = { _id: { toString: () => 'installation-id' } } as unknown as Pick<
       ConnectorInstallationDocument,
       '_id'
     >;
@@ -55,7 +55,7 @@ describe('createConnectorMCPAuthorizationGuard', () => {
     const guard = createConnectorMCPAuthorizationGuard({
       findInstallationByMCPServerId: jest.fn().mockResolvedValue({
         _id: { toString: () => 'installation-id' },
-      }),
+      } as unknown as Pick<ConnectorInstallationDocument, '_id'>),
       authorizeInstallation: jest.fn().mockRejectedValue(new Error('denied')),
     });
     await expect(guard(config())).rejects.toThrow('denied');
