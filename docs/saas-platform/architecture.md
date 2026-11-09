@@ -193,3 +193,19 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
 The adapter is deliberately not wired to HTTP routes or provider tools yet. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
+
+
+### Google Workspace OAuth orchestration — implementation progress
+
+- [x] Add tenant-bound OAuth orchestration with high-entropy state, SHA-256 state-hash persistence contract, ten-minute expiry, and S256 PKCE.
+- [x] Atomically consume the state through an injected store contract before callback exchange; reject invalid, expired, and replayed state.
+- [x] Re-establish the trusted tenant/principal context for callback installation reads, credential-vault writes, and lifecycle transitions.
+- [x] Re-check installation tenant, owner, provider, and revocation status before exchanging the authorization code.
+- [x] Persist access/refresh tokens only through ConnectorCredentialVault and mark the installation connected with version-checked transition.
+- [x] Add unit tests for state creation/hash-only storage, ownership denial, PKCE exchange, encrypted vault handoff, replay rejection, revoked installation, and malformed callback input.
+- [ ] Implement the durable state collection with unique state-hash index, protected verifier storage, TTL cleanup, and atomic find-and-delete consume.
+- [ ] Wire authenticated start and callback HTTP routes with fixed redirect URI, CSRF protections, error/cancel handling, and user-facing connection status.
+- [ ] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
+- [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
+
+The orchestration service is not yet production-wired: its state store and trusted-context runner are injected contracts, and no HTTP route has been added. Tests are authored but not executed.
