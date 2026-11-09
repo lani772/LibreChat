@@ -18,13 +18,15 @@ function key(): Buffer {
   return Buffer.from(value, 'hex');
 }
 
-function aad(context: { stateHash: string; tenantId: string; principalId: string; installationId: string }): Buffer {
+function aad(context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number }): Buffer {
   return Buffer.from(JSON.stringify([
     'google-oauth-pkce-verifier',
     context.stateHash,
     context.tenantId,
     context.principalId,
     context.installationId,
+    context.redirectUri,
+    context.expiresAt,
   ]));
 }
 
