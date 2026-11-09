@@ -1,4 +1,3 @@
-import { tenantStorage } from '@librechat/data-schemas';
 import type { ConnectorService } from './ConnectorService';
 import { ConnectorCredentialVault } from './ConnectorCredentialVault';
 
@@ -18,7 +17,7 @@ describe('ConnectorCredentialVault', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.CONNECTOR_CREDENTIALS_KEY = '22'.repeat(32);
-    vault = new ConnectorCredentialVault(store, connectorService);
+    vault = new ConnectorCredentialVault(store, connectorService, () => 'tenant-a');
     store.putConnectorCredential.mockResolvedValue({
       installationId,
       provider: 'chatwoot',
@@ -34,9 +33,7 @@ describe('ConnectorCredentialVault', () => {
   });
 
   it('encrypts credentials before persistence and stores no plaintext', async () => {
-    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
-      vault.storeCredentials(installationId, 'chatwoot', { apiToken: 'plaintext-secret' }),
-    );
+    await vault.storeCredentials(installationId, 'chatwoot', { apiToken: 'plaintext-secret' });
     const stored = store.putConnectorCredential.mock.calls[0][0];
     expect(stored.encryptedPayload).not.toContain('plaintext-secret');
     expect(stored.keyVersion).toBe('gcm1');
