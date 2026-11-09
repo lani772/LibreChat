@@ -18,6 +18,7 @@ import { useMCPRefresh } from '~/hooks/MCP/useMCPRefresh';
 import MCPAdminSettings from './MCPAdminSettings';
 import MCPServerDialog from './MCPServerDialog';
 import MCPServerList from './MCPServerList';
+import GoogleWorkspaceConnections from './GoogleWorkspaceConnections';
 import store from '~/store';
 
 export default function MCPBuilderPanel() {
