@@ -19,6 +19,7 @@ import {
   createConnectorCredentialMethods,
   type ConnectorCredentialMethods,
 } from './connectorCredential';
+import { createGoogleOAuthStateMethods, type GoogleOAuthStateMethods } from './googleOAuthState';
 import { createScheduleMCPConsentStorage } from './scheduleConsent';
 export { createScheduleMCPConsentStorage } from './scheduleConsent';
 export type { ScheduleMCPConsentStorage, ScheduleConsentSnapshot } from './scheduleConsent';
@@ -285,6 +286,7 @@ export type AllMethods = SubagentContentMethods &
   ToolApprovalGrantStorage &
   ConnectorInstallationMethods &
   ConnectorCredentialMethods &
+  GoogleOAuthStateMethods &
   UserMethods &
   SessionMethods &
   TokenMethods &
@@ -532,6 +534,7 @@ export function createMethods(
     ...createToolApprovalGrantMethods(mongoose),
     ...createConnectorInstallationMethods(mongoose),
     ...createConnectorCredentialMethods(mongoose),
+    ...createGoogleOAuthStateMethods(mongoose),
     ...createSessionMethods(mongoose),
     ...createTokenMethods(mongoose),
     ...createTokenListMethods(mongoose),
@@ -630,6 +633,7 @@ export type {
   MCPServerMethods,
   ConnectorInstallationMethods,
   ConnectorCredentialMethods,
+  GoogleOAuthStateMethods,
   CodeEnvironmentMethods,
   UserGroupMethods,
   AclEntryMethods,
