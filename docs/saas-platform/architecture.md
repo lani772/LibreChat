@@ -139,6 +139,21 @@ These findings mean that the current MCP support is a foundation, not proof that
 - Add deployment, backup, secret rotation, monitoring, and incident-response documentation.
 - Run focused tests, workspace typechecks, lint/static checks, and end-to-end tests on the exact pushed head.
 
+### Milestone 2.5 — Connector-to-MCP authorization binding
+
+- [x] Bind connector installations to stable MCPServer database IDs with owner verification and a tenant-scoped unique index.
+- [x] Add a dependency-injected guard that resolves installations only from trusted ParsedServerConfig.dbId.
+- [x] Inject the guard into the existing MCPManager without capturing tenant or user identity in the process-wide singleton.
+- [x] Enforce authorization before tool-catalog discovery, before connection checkout, and again immediately before upstream tool dispatch/retry.
+- [x] Preserve ordinary unbound MCP server behavior.
+- [x] Add focused guard tests and MCPManager boundary tests.
+- [x] Use the existing tenant-isolated User lookup to verify membership and the existing hash-chained audit writer for authorization events.
+- [ ] Add a dedicated tenant-shared connector permission to the existing role model. Until then, tenant-shared connector invocation is explicitly denied; do not infer permission from tenant membership or admin labels.
+- [ ] Implement the protected credential vault and provider-specific credential lookup/revocation adapters.
+- [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
+
+The runtime guard is committed on the feature branch. Test files have been authored but have not been executed in this environment. The membership adapter currently permits personal-owner and explicit-grant checks only when the principal is present in the active tenant partition; tenant-shared connectors remain denied pending a first-class permission.
+
 ## Acceptance criteria
 
 A milestone is complete only when code and tests demonstrate the behavior. At minimum, the platform must prove:
