@@ -34,6 +34,7 @@ export class ConnectorCredentialVault {
   constructor(
     private readonly store: ConnectorCredentialStore,
     private readonly connectors: ConnectorService,
+    private readonly getTenantIdFromContext: () => string | undefined = getTenantId,
   ) {}
 
   async storeCredentials(
@@ -48,7 +49,7 @@ export class ConnectorCredentialVault {
     if (!json || Buffer.byteLength(json, 'utf8') > 64 * 1024) {
       throw new Error('Connector credential payload exceeds the 64 KiB limit');
     }
-    const tenantId = getTenantId();
+    const tenantId = this.getTenantIdFromContext();
     if (!tenantId || tenantId === '__SYSTEM__') {
       throw new Error('Connector credential storage requires an active tenant context');
     }
