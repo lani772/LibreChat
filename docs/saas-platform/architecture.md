@@ -186,13 +186,13 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [x] Define a provider-neutral OAuth lifecycle contract for authorization-code exchange, refresh, and revocation.
 - [x] Add a Google Workspace token-endpoint adapter using fixed Google endpoints, bounded requests, PKCE verifier forwarding, offline refresh-token requirement on initial exchange, and redacted provider errors.
 - [x] Add focused adapter tests for exchange, missing refresh token, refresh without token rotation, safe errors, idempotent revocation, and missing configuration.
-- [ ] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
-- [ ] Connect the adapter to the ConnectorCredentialVault so credentials are persisted immediately and refreshed credentials are atomically rotated without exposing tokens.
+- [x] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
+- [x] Connect the authorization-code exchange to ConnectorCredentialVault so initial credentials are encrypted and persisted without exposing tokens; refresh-token rotation remains outstanding.
 - [ ] Define least-privilege Google Workspace scopes and implement the first read-only provider API tool.
 - [ ] Add scheduled/just-in-time refresh coordination, remote revocation orchestration, and disconnect/reconnect lifecycle handling.
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
-The adapter is deliberately not wired to HTTP routes or provider tools yet. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
+The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. The first provider API tool, refresh scheduling, remote revocation, and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
 
 
 ### Google Workspace OAuth orchestration — implementation progress
@@ -203,9 +203,9 @@ The adapter is deliberately not wired to HTTP routes or provider tools yet. Test
 - [x] Re-check installation tenant, owner, provider, and revocation status before exchanging the authorization code.
 - [x] Persist access/refresh tokens only through ConnectorCredentialVault and mark the installation connected with version-checked transition.
 - [x] Add unit tests for state creation/hash-only storage, ownership denial, PKCE exchange, encrypted vault handoff, replay rejection, revoked installation, and malformed callback input.
-- [ ] Implement the durable state collection with unique state-hash index, protected verifier storage, TTL cleanup, and atomic find-and-delete consume.
-- [ ] Wire authenticated start and callback HTTP routes with fixed redirect URI, CSRF protections, error/cancel handling, and user-facing connection status.
+- [x] Implement the durable MongoDB state collection with a unique state-hash index, encrypted PKCE verifier, TTL cleanup, and atomic find-and-delete consume.
+- [x] Wire authenticated same-origin POST initiation and public callback routes with fixed redirect URI, rate limiting, and state-consuming provider cancellation. Browser UI/status presentation remains outstanding.
 - [ ] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
 - [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
 
-The orchestration service is not yet production-wired: its state store and trusted-context runner are injected contracts, and no HTTP route has been added. Tests are authored but not executed.
+The orchestration service is wired to the production MongoDB state store, independent PKCE-verifier encryption key, and tenant AsyncLocalStorage context runner. HTTP routes are mounted; the frontend connection UI is not yet implemented. Tests are authored but not executed.
