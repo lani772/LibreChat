@@ -1,47 +1,35 @@
-# Connector installation persistence
+# Connector installation and credential persistence
 
-The connector installation record stores tenant-scoped ownership and lifecycle metadata in MongoDB. It is deliberately separate from provider credentials and live MCP connections.
+Connector installation metadata and provider credentials are stored separately. Installation documents contain tenant ownership, visibility, lifecycle, MCP binding, and version metadata. They must never contain provider secrets.
 
-## Stored data
+## Installation records
 
-- Tenant ID, stamped by LibreChat's existing tenant-isolation plugin.
-- Owner user ID, derived from the authenticated tenantStorage context (not accepted as caller input).
-- Provider identifier, display name, personal/tenant visibility, and internal opaque instance key.
-- Lifecycle state, optimistic version, timestamps, and a bounded error code.
-- An optional opaque credential reference. This is not a token or secret; a dedicated protected credential adapter is still required before provider authentication is enabled.
+- Tenant ID is stamped and enforced by LibreChat's tenant-isolation plugin.
+- Owner ID is derived from trusted tenant request context.
+- Provider, display name, visibility, opaque instance key, state, and optimistic version are stored.
+- Ordinary reads and list results do not expose the legacy `credentialRef` field.
+- The new credential vault does not store plaintext or ciphertext in installation documents.
+- Revocation changes installation state first, clears the legacy pointer, increments the version, and deletes the separate encrypted credential record.
 
-The credential reference is excluded from ordinary reads and list results. The create result strips it as well. No OAuth token, API key, QR payload, WhatsApp session, or provider credential may be stored in this collection.
+## Credential vault
 
-## Persistence behavior
+The `connectorcredentials` collection stores only an AES-256-GCM envelope, tenant ID, installation ID, provider, owner ID, and algorithm/key version metadata. The encrypted payload is excluded from normal Mongoose projections. Its unique index is tenant + installation scoped, and the collection participates in the tenant index migration.
 
-- All operations require an active non-system tenant context.
-- The existing Mongoose tenant-isolation plugin scopes reads and writes.
-- The installation schema is registered in createModels and the data methods are exposed through createMethods.
-- Tenant index migration includes the new collection.
-- State transitions use an expected version and compare-and-set update to reject stale concurrent writes.
-- Revocation changes state to revoked, clears the credential pointer, and increments the version.
+Owner-only writes and deletes derive the principal from trusted request context and verify that the connector installation belongs to that owner and tenant. Credential reads are tenant-scoped. Application code should obtain plaintext only through `ConnectorCredentialVault.withCredentials()`, which invokes `ConnectorService.execute()` first so authorization and durable audit complete before ciphertext lookup/decryption.
 
-## Trusted MCP server binding
+New credentials require the dedicated `CONNECTOR_CREDENTIALS_KEY` environment variable: exactly 32 bytes encoded as 64 hexadecimal characters. Use a deployment secret manager; generate a key with `openssl rand -hex 32`. Never commit or log it, and do not reuse `CREDS_KEY`. AES-GCM authenticates the tenant ID, installation ID, and provider as additional authenticated data. Tampering or moving a ciphertext between contexts fails decryption. There is no plaintext or legacy-cipher fallback. Payloads are limited to 64 KiB.
 
-A connector installation can be bound to a database-backed LibreChat MCP server through `mcpServerId`, which stores the immutable MongoDB `MCPServer` record ID corresponding to `ParsedServerConfig.dbId`. The binding method:
+## MCP authorization integration
 
-- Requires trusted tenant and authenticated-user context.
-- Confirms the MCP server record belongs to the authenticated user in the active tenant.
-- Confirms the connector installation belongs to that same user.
-- Uses the installation version for compare-and-set updates.
-- Enforces one connector installation per MCP server within a tenant.
-- Exposes a tenant-scoped lookup by MCP server ID without returning `credentialRef`.
+Connector installations bind to database-backed MCP servers through the immutable MongoDB `MCPServer` record ID. The existing MCPManager guard resolves this binding from trusted `ParsedServerConfig.dbId`, authorizes before discovery and execution, and rechecks immediately before upstream tool dispatch. Ordinary unbound MCP servers retain their existing behavior.
 
-This binding currently covers database-backed MCP server records. Operator/YAML/plugin servers do not have a user-owned `MCPServer` record and must not be implicitly treated as connector-backed.
+Tenant-shared connector invocation requires the dedicated `MCP_SERVERS.INVOKE_CONNECTORS` role permission. It is separate from general MCP use. Permission is resolved from the current tenant role on every authorization attempt. Personal connector access still requires tenant membership and owner or explicit grant.
 
-## Security boundary still to implement
+## Security boundaries and remaining work
 
-This is the persistence layer, not a complete connector service. API/service entry points must still:
-1. Resolve tenant and principal from trusted authentication middleware.
-2. Apply authorizeConnectorInvocation and owner/visibility policy before reads, updates, credential resolution, or execution.
-3. Implement a protected credential adapter and provider-specific revoke/rotation behavior.
-4. Enforce this binding in MCP discovery and tool execution using the trusted `dbId` from the resolved server config; this runtime guard is not wired yet.
-5. Invalidate MCP connection and tool caches on disconnect, revoke, or permission changes.
-6. Add redacted audit events.
-
-Do not expose raw data methods directly as public HTTP endpoints or model-callable tools.
+- Never expose raw data methods as public HTTP endpoints or model-callable tools.
+- Provider adapters must call `withCredentials()` for every provider request and must never return credential values in tool results, model context, or logs.
+- Provider-specific OAuth handshakes, refresh-token rotation, remote provider revocation, and concrete Google Workspace/Chatwoot/n8n/WhatsApp adapters are not yet implemented.
+- KMS/HSM-backed key management and automated key rotation/re-encryption are not yet implemented. Plan a coordinated re-encryption migration before rotating the active key.
+- Installation revocation disables authorization before ciphertext deletion. If deletion fails, the installation remains unusable; retry cleanup through the owner-scoped delete operation.
+- Tests have been authored for encryption integrity, context binding, tenant isolation, owner checks, authorization-before-decryption, and revocation cleanup. They still need to be executed in a configured checkout.
