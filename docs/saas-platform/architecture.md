@@ -109,11 +109,13 @@ These findings mean that the current MCP support is a foundation, not proof that
 
 ### Milestone 2 — Persisted installations and catalog
 
-- Inspect existing schema and migration conventions before choosing collection changes.
-- Add stable connector installation IDs and tenant/user ownership fields only where existing models cannot safely represent them.
-- Add indexes and migration/rollback strategy.
-- Add audit events for connect, authorize, disconnect, revoke, permission change, and tool execution.
-- Do not store provider access tokens in client-visible configuration.
+- [x] Inspect existing schema and migration conventions.
+- [x] Add a tenant-scoped ConnectorInstallation model with stable MongoDB IDs and opaque instance keys.
+- [x] Derive installation ownership from authenticated tenant context rather than caller-supplied owner IDs.
+- [x] Register the model and data methods; include the collection in tenant index migration.
+- [x] Add version-checked lifecycle transitions and a revocation operation.
+- [ ] Add the service/API authorization boundary, credential adapter, audit events, cache invalidation, and provider-specific revoke behavior.
+- Provider credentials remain outside this collection; the opaque credential reference is not yet backed by a completed connector credential adapter.
 
 ### Milestone 3 — First-party connector vertical slice
 
