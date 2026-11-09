@@ -10,7 +10,8 @@ import type { ToolApprovalGrantStorage } from 'librechat-data-provider';
 import type { ScheduleMCPConsentStorage } from './scheduleConsent';
 import type { ClearFileCodeEnvRefsParams } from '~/types/file';
 import type { FileStorageMethods } from './fileStorage';
-import { createToolApprovalGrantMethods } from './toolApprovalGrant';\nimport { createConnectorInstallationMethods, type ConnectorInstallationMethods } from './connectorInstallation';
+import { createToolApprovalGrantMethods } from './toolApprovalGrant';
+import { createConnectorInstallationMethods, type ConnectorInstallationMethods } from './connectorInstallation';
 import { createScheduleMCPConsentStorage } from './scheduleConsent';
 export { createScheduleMCPConsentStorage } from './scheduleConsent';
 export type { ScheduleMCPConsentStorage, ScheduleConsentSnapshot } from './scheduleConsent';
@@ -274,7 +275,8 @@ export {
 };
 
 export type AllMethods = SubagentContentMethods &
-  ToolApprovalGrantStorage &\n  ConnectorInstallationMethods &
+  ToolApprovalGrantStorage &
+  ConnectorInstallationMethods &
   UserMethods &
   SessionMethods &
   TokenMethods &
@@ -519,7 +521,8 @@ export function createMethods(
   const agentMethods = createAgentMethods(mongoose, agentDeps);
   return {
     ...createUserMethods(mongoose, { getCache: deps.getCache }),
-    ...createToolApprovalGrantMethods(mongoose),\n    ...createConnectorInstallationMethods(mongoose),
+    ...createToolApprovalGrantMethods(mongoose),
+    ...createConnectorInstallationMethods(mongoose),
     ...createSessionMethods(mongoose),
     ...createTokenMethods(mongoose),
     ...createTokenListMethods(mongoose),
@@ -615,7 +618,8 @@ export type {
   ToolFavoriteMethods,
   AgentCategoryMethods,
   AgentApiKeyMethods,
-  MCPServerMethods,\n  ConnectorInstallationMethods,
+  MCPServerMethods,
+  ConnectorInstallationMethods,
   CodeEnvironmentMethods,
   UserGroupMethods,
   AclEntryMethods,
