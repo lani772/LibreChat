@@ -19,6 +19,8 @@ const connectorInstallationSchema = new Schema<ConnectorInstallationDocument>(
     // Opaque reference only. Never put access tokens, refresh tokens, API keys,
     // OAuth codes, QR payloads, or WhatsApp session material in this document.
     credentialRef: { type: String, select: false },
+    // Binds this connector to a database-backed MCP server by immutable record ID.
+    mcpServerId: { type: String, match: /^[a-f\\d]{24}$/i },
     grantedPrincipalIds: { type: [String], default: [] },
     lastConnectedAt: { type: Date },
     lastErrorCode: { type: String, maxlength: 80 },
@@ -30,6 +32,14 @@ const connectorInstallationSchema = new Schema<ConnectorInstallationDocument>(
 connectorInstallationSchema.index(
   { tenantId: 1, ownerUserId: 1, provider: 1, instanceKey: 1 },
   { unique: true, name: 'connector_installation_owner_provider_instance_tenant_unique' },
+);
+connectorInstallationSchema.index(
+  { tenantId: 1, mcpServerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { mcpServerId: { $type: 'string' } },
+    name: 'connector_installation_mcp_server_tenant_unique',
+  },
 );
 connectorInstallationSchema.index(
   { tenantId: 1, state: 1, updatedAt: -1 },
