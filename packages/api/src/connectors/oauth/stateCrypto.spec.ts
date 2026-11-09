@@ -7,6 +7,8 @@ describe('Google OAuth PKCE verifier encryption', () => {
     tenantId: 'tenant-a',
     principalId: 'user-a',
     installationId: '64b000000000000000000001',
+    redirectUri: 'https://app.example.test/api/connectors/google-workspace/callback',
+    expiresAt: 1790000000000,
   };
 
   beforeEach(() => {
