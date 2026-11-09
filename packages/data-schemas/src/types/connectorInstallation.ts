@@ -29,6 +29,8 @@ export interface ConnectorInstallationDocument {
   visibility: ConnectorInstallationVisibility;
   state: ConnectorInstallationState;
   credentialRef?: string;
+  /** Stable MongoDB MCPServer record ID; never a display name. */
+  mcpServerId?: string;
   grantedPrincipalIds: string[];
   lastConnectedAt?: Date;
   lastErrorCode?: string;
