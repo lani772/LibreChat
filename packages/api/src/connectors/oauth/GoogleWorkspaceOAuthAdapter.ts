@@ -11,6 +11,17 @@ export interface GoogleWorkspaceOAuthConfig {
 
 export type OAuthFetch = typeof fetch;
 
+export class GoogleWorkspaceOAuthError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'GoogleWorkspaceOAuthError';
+  }
+}
+
 interface GoogleTokenResponse {
   access_token?: unknown;
   refresh_token?: unknown;
@@ -83,8 +94,21 @@ export class GoogleWorkspaceOAuthAdapter implements ConnectorOAuthAdapter {
       throw new Error('Google OAuth endpoint is temporarily unavailable');
     }
     if (!response.ok) {
-      // Do not propagate provider response bodies: they can contain sensitive request details.
-      throw new Error(`Google OAuth request failed (HTTP ${response.status})`);
+      // Extract only a constrained machine-readable code; never expose provider descriptions.
+      let code: string | undefined;
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body.error === 'string' && /^[a-z0-9_]{1,64}$/i.test(body.error)) {
+          code = body.error;
+        }
+      } catch {
+        // Non-JSON provider responses are intentionally ignored.
+      }
+      throw new GoogleWorkspaceOAuthError(
+        `Google OAuth request failed (HTTP ${response.status})`,
+        response.status,
+        code,
+      );
     }
     return response;
   }
