@@ -1333,6 +1333,45 @@ router.get('/connectors/google/oauth/callback', mcpAppAdmissionLimiter, async (r
   }
 });
 
+
+/**
+ * Return only safe connection metadata for an owned Google Workspace installation.
+ * Credential references, encrypted payloads, and provider tokens are never serialized.
+ */
+router.get('/connectors/google/:installationId/status', requireJwtAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const tenantId = getTenantId();
+    const { installationId } = req.params;
+    if (!user?.id || !tenantId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+      return res.status(400).json({ error: 'Invalid connector status request' });
+    }
+    const installation = await db.getConnectorInstallation(installationId);
+    if (
+      !installation ||
+      installation.tenantId !== tenantId ||
+      installation.ownerUserId !== user.id ||
+      installation.provider !== 'google-workspace'
+    ) {
+      return res.status(404).json({ error: 'Connector installation not found' });
+    }
+    return res.json({
+      installationId,
+      provider: installation.provider,
+      displayName: installation.displayName,
+      state: installation.state,
+      lastConnectedAt: installation.lastConnectedAt ?? null,
+      lastErrorCode: installation.lastErrorCode ?? null,
+      version: installation.version,
+    });
+  } catch (error) {
+    logger.warn('[Connectors] Google Workspace status lookup failed', {
+      error: error?.name || 'Error',
+    });
+    return res.status(500).json({ error: 'Unable to retrieve connector status' });
+  }
+});
+
 /**
 MCP Server CRUD Routes (User-Managed MCP Servers)
 */
