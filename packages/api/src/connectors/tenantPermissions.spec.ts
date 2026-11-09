@@ -43,7 +43,24 @@ describe('tenant connector role permission resolver', () => {
     });
   });
 
-  it('denies missing or malformed permission data', async () => {
+  it('denies missing connector permission even when general MCP use is enabled', async () => {
+    const resolve = createTenantConnectorPermissionResolver({
+      getUserById: async () => ({ tenantId, role: 'MEMBER' }),
+      getPartitionRole: async () => ({
+        permissions: {
+          [PermissionTypes.MCP_SERVERS]: {
+            [Permissions.USE]: true,
+          },
+        },
+      }),
+    });
+    await expect(resolve({ tenantId, principalId })).resolves.toEqual({
+      isTenantMember: true,
+      canInvokeTenantConnector: false,
+    });
+  });
+
+  it('denies malformed permission data', async () => {
     const { resolve } = makeResolver({ permission: undefined });
     await expect(resolve({ tenantId, principalId })).resolves.toEqual({
       isTenantMember: true,
