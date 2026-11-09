@@ -34,7 +34,7 @@ function setup() {
       return value;
     }),
   };
-  const runWithIdentity = jest.fn(async (_identity: typeof identity, operation: () => Promise<unknown>) => operation());
+  const runWithIdentity = jest.fn(<T>(_identity: { tenantId: string; principalId: string }, operation: () => Promise<T>): Promise<T> => operation());
   const flow = new GoogleWorkspaceOAuthFlow({
     adapter, vault, installations, states, runWithIdentity,
     clientId: 'client-id',
