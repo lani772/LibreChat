@@ -22,7 +22,11 @@ function clientResultUrl(result) {
 /**
  * Return only the authenticated owner's safe connection status; never return credential metadata.
  */
-router.get('/google-workspace/:installationId/status', loginLimiter, requireJwtAuth, async (req, res) => {
+router.get(
+  '/google-workspace/:installationId/status',
+  loginLimiter,
+  requireJwtAuth,
+  async (req, res) => {
   setNoStoreHeaders(res);
   const tenantId = getTenantId();
   const principalId = getUserId();
@@ -52,7 +56,8 @@ router.get('/google-workspace/:installationId/status', loginLimiter, requireJwtA
   } catch {
     return res.status(404).json({ error: 'Connector installation is unavailable' });
   }
-});
+  },
+);
 
 /**
  * Start connector authorization only from an authenticated, same-origin browser request.
