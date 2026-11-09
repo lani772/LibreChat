@@ -33,7 +33,7 @@ function aad(context: { stateHash: string; tenantId: string; principalId: string
 /** Encrypt PKCE verifier with a dedicated key and transaction-bound AAD. */
 export function encryptGoogleOAuthVerifier(
   verifier: string,
-  context: { stateHash: string; tenantId: string; principalId: string; installationId: string },
+  context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number },
 ): string {
   if (!verifier || verifier.length > 256) throw new Error('Invalid Google OAuth PKCE verifier');
   const nonce = randomBytes(12);
@@ -51,7 +51,7 @@ export function encryptGoogleOAuthVerifier(
 
 export function decryptGoogleOAuthVerifier(
   serialized: string,
-  context: { stateHash: string; tenantId: string; principalId: string; installationId: string },
+  context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number },
 ): string {
   let envelope: OAuthStateVerifierEnvelope;
   try {
