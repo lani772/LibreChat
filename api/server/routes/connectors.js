@@ -68,10 +68,11 @@ router.post('/google-workspace', loginLimiter, requireJwtAuth, requireSameOrigin
   const tenantId = getTenantId();
   const principalId = getUserId();
   const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+  if (!tenantId || !principalId || !displayName || displayName.length > 120) {
+    return res.status(400).json({ error: 'A connector name between 1 and 120 characters is required' });
+  }
   if (!getGoogleWorkspaceOAuthFlow()) {
     return res.status(503).json({ error: 'Google Workspace authorization is not configured' });
-  }\n  if (!tenantId || !principalId || !displayName || displayName.length > 120) {
-    return res.status(400).json({ error: 'A connector name between 1 and 120 characters is required' });
   }
   try {
     const installation = await db.createConnectorInstallation({
