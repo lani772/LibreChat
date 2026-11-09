@@ -15,7 +15,7 @@ function makeResolver({
   const getPartitionRole = jest.fn().mockResolvedValue(
     permission === undefined
       ? { permissions: {} }
-      : { permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: permission } } },
+      : { permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.INVOKE_CONNECTORS]: permission } } },
   );
   return {
     resolve: createTenantConnectorPermissionResolver({ getUserById, getPartitionRole }),
@@ -25,7 +25,7 @@ function makeResolver({
 }
 
 describe('tenant connector role permission resolver', () => {
-  it('allows a tenant member whose current tenant role permits MCP server use', async () => {
+  it('allows a tenant member whose current tenant role permits connector invocation', async () => {
     const { resolve, getUserById, getPartitionRole } = makeResolver();
     await expect(resolve({ tenantId, principalId })).resolves.toEqual({
       isTenantMember: true,
@@ -35,7 +35,7 @@ describe('tenant connector role permission resolver', () => {
     expect(getPartitionRole).toHaveBeenCalledWith('MEMBER');
   });
 
-  it('denies a member whose role does not grant MCP server use', async () => {
+  it('denies a member whose role does not grant connector invocation', async () => {
     const { resolve } = makeResolver({ permission: false });
     await expect(resolve({ tenantId, principalId })).resolves.toEqual({
       isTenantMember: true,
