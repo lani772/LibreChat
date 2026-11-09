@@ -279,7 +279,6 @@ export type AllMethods = SubagentContentMethods &
   ToolApprovalGrantStorage &
   ConnectorInstallationMethods &
   ConnectorCredentialMethods &
-  ConnectorCredentialMethods &
   UserMethods &
   SessionMethods &
   TokenMethods &
