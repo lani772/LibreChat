@@ -173,6 +173,8 @@ async function initializeMCPs() {
       /^[a-f\d]{64}$/i.test(process.env.CONNECTOR_CREDENTIALS_KEY || '')
     ) {
       try {
+        // These constraints are security-critical even when MONGO_AUTO_INDEX is disabled.
+        await mongoose.models.GoogleOAuthState.createIndexes();
         const adapter = new GoogleWorkspaceOAuthAdapter({
           clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
