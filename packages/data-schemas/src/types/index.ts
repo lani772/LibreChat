@@ -57,3 +57,4 @@ export * from './mcp';
 export * from './mcpAuthority';
 
 export * from './connectorInstallation';
+export * from './connectorCredential';
