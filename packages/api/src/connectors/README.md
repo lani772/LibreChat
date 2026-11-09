@@ -77,3 +77,17 @@ Authenticated API routes (mounted under `/api/connectors`):
 Both routes return metadata only and set no-store headers. The connector service performs tenant, membership, installation-state, owner/grant, and tenant-shared role checks; failures do not reach Google. These are HTTP API endpoints for the application layer; they are not yet registered as model-callable MCP/Agent tools, and no Drive file content is returned.
 
 Focused tests cover listing, metadata retrieval, scope denial, authorization-before-provider-call, pagination validation, safe provider errors, and HTTP route behavior. Tests are authored but have not been executed in a dependency-enabled checkout.
+
+
+## Google Workspace installation management and model tools
+
+Authenticated owner-scoped routes now create and list personal Google Workspace installations:
+- `POST /api/connectors/google-workspace` creates a disconnected installation from a display name; owner and tenant are derived from trusted request context.
+- `GET /api/connectors/google-workspace` lists only the current principal's installations in the active tenant and returns safe metadata only.
+- The existing `POST /api/connectors/google-workspace/:installationId/authorize` starts OAuth for that installation.
+
+The MCP Servers side panel includes a Google Workspace connection manager. It creates an installation, starts Google OAuth, displays connection state, supports reauthorization, and disconnects accounts. The OAuth callback redirects to the client with a one-time UI result marker; no tokens or OAuth state are exposed in the UI.
+
+The built-in `google_drive` agent/assistant tool is registered through LibreChat's manifest, tool-definition registry, and existing runtime loader. Its actions are `search_files` and `get_file_metadata`. It selects the sole connected personal account automatically, or returns safe account IDs/names for explicit selection when multiple accounts are connected. The selected installation ID is never treated as authorization: the connector service rechecks trusted tenant, membership, installation state, owner/grant, and tenant role at invocation time. Tool output contains only allowlisted metadata and safe error messages. The tool is read-only and does not provide content download/export, upload, edit, delete, or sharing operations.
+
+Tests have been authored for installation list/create routes, Google Drive tool account selection, metadata lookup, and provider error redaction. They have not been executed in a dependency-enabled checkout.
