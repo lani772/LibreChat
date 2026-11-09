@@ -26,7 +26,7 @@ describe('connector installation persistence', () => {
   });
 
   it('stamps tenant scope and never exposes credential references in list results', async () => {
-    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().createConnectorInstallation({
         provider: 'google-workspace',
         displayName: 'Google Workspace',
@@ -38,7 +38,7 @@ describe('connector installation persistence', () => {
     expect(created.ownerUserId).toBe('user-a');
     expect(created.credentialRef).toBeUndefined();
 
-    const listed = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const listed = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().listConnectorInstallations(),
     );
     expect(listed).toHaveLength(1);
@@ -46,21 +46,21 @@ describe('connector installation persistence', () => {
   });
 
   it('does not return installations belonging to another tenant', async () => {
-    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().createConnectorInstallation({
                 provider: 'chatwoot',
         displayName: 'Support',
         visibility: 'personal',
       }),
     );
-    const visible = await tenantStorage.run({ tenantId: 'tenant-b', userId: 'user-b' }, () =>
+    const visible = await tenantStorage.run({ tenantId: 'tenant-b', userId: 'user-b' }, async () =>
       methods().listConnectorInstallations(),
     );
     expect(visible).toHaveLength(0);
   });
 
   it('uses optimistic version checks and enforces lifecycle transitions', async () => {
-    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().createConnectorInstallation({
                 provider: 'n8n',
         displayName: 'Automation',
@@ -68,7 +68,7 @@ describe('connector installation persistence', () => {
       }),
     );
 
-    const authorizing = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const authorizing = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().transitionConnectorInstallation({
         installationId: String(created._id),
         expectedVersion: 0,
@@ -79,7 +79,7 @@ describe('connector installation persistence', () => {
     expect(authorizing?.version).toBe(1);
 
     await expect(
-      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
         methods().transitionConnectorInstallation({
           installationId: String(created._id),
           expectedVersion: 1,
@@ -89,7 +89,7 @@ describe('connector installation persistence', () => {
     ).resolves.toMatchObject({ state: 'connected', version: 2 });
 
     await expect(
-      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
         methods().transitionConnectorInstallation({
           installationId: String(created._id),
           expectedVersion: 0,
@@ -100,7 +100,7 @@ describe('connector installation persistence', () => {
   });
 
   it('rejects invalid lifecycle transitions', async () => {
-    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().createConnectorInstallation({
                 provider: 'n8n',
         displayName: 'Automation',
@@ -108,7 +108,7 @@ describe('connector installation persistence', () => {
       }),
     );
     await expect(
-      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
         methods().transitionConnectorInstallation({
           installationId: String(created._id),
           expectedVersion: 0,
@@ -129,7 +129,7 @@ describe('connector installation persistence', () => {
   });
 
   it('revokes an installation and removes its credential reference', async () => {
-    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().createConnectorInstallation({
                 provider: 'chatwoot',
         displayName: 'Support',
@@ -137,11 +137,11 @@ describe('connector installation persistence', () => {
         credentialRef: 'vault-ref-456',
       }),
     );
-    const revoked = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const revoked = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().revokeConnectorInstallation(String(created._id)),
     );
     expect(revoked).toBe(true);
-    const stored = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+    const stored = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       mongoose.models.ConnectorInstallation.findById(created._id)
         .select('+credentialRef')
         .lean(),
