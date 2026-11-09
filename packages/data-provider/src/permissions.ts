@@ -160,6 +160,8 @@ export enum Permissions {
    * per-user delegated tokens to whatever URL the server points at.
    */
   CONFIGURE_OBO = 'CONFIGURE_OBO',
+  /** Can invoke tenant-shared connector installations through MCP. */
+  INVOKE_CONNECTORS = 'INVOKE_CONNECTORS',
 }
 
 export const promptPermissionsSchema = z.object({
@@ -240,6 +242,7 @@ export const mcpServersPermissionsSchema = z.object({
   [Permissions.SHARE]: z.boolean().default(false),
   [Permissions.SHARE_PUBLIC]: z.boolean().default(false),
   [Permissions.CONFIGURE_OBO]: z.boolean().default(false),
+  [Permissions.INVOKE_CONNECTORS]: z.boolean().default(false),
 });
 export type TMcpServersPermissions = z.infer<typeof mcpServersPermissionsSchema>;
 
