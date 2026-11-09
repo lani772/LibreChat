@@ -140,36 +140,37 @@ export class GoogleWorkspaceOAuthFlow {
     }
     const identity = { tenantId: pending.tenantId, principalId: pending.principalId };
     try {
-      const installation = await this.deps.installations.getConnectorInstallation(pending.installationId);
-      if (
-        !installation ||
-        installation.tenantId !== pending.tenantId ||
-        installation.ownerUserId !== pending.principalId ||
-        installation.provider !== 'google-workspace' ||
-        installation.state === 'revoked'
-      ) {
-        throw new Error('Google Workspace connector installation is unavailable');
-      }
-      const tokens = await this.deps.adapter.exchangeAuthorizationCode({
-        code: input.code,
-        redirectUri: pending.redirectUri,
-        codeVerifier: pending.codeVerifier,
-      });
-      await this.deps.runWithIdentity(identity, () =>
-        this.deps.vault.storeCredentials(pending.installationId, 'google-workspace', {
+      return await this.deps.runWithIdentity(identity, async () => {
+        const installation = await this.deps.installations.getConnectorInstallation(pending.installationId);
+        if (
+          !installation ||
+          installation.tenantId !== pending.tenantId ||
+          installation.ownerUserId !== pending.principalId ||
+          installation.provider !== 'google-workspace' ||
+          installation.state === 'revoked'
+        ) {
+          throw new Error('Google Workspace connector installation is unavailable');
+        }
+        const tokens = await this.deps.adapter.exchangeAuthorizationCode({
+          code: input.code,
+          redirectUri: pending.redirectUri,
+          codeVerifier: pending.codeVerifier,
+        });
+        await this.deps.vault.storeCredentials(pending.installationId, 'google-workspace', {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           expiresAt: tokens.expiresAt,
           scopes: tokens.scopes,
           tokenType: tokens.tokenType,
-        }),
-      );
-      await this.deps.installations.transitionConnectorInstallation({
-        installationId: pending.installationId,
-        expectedVersion: installation.version,
-        state: 'connected',
+        });
+        await this.deps.installations.transitionConnectorInstallation({
+          installationId: pending.installationId,
+          expectedVersion: installation.version,
+          state: 'connected',
+        });
+        return { installationId: pending.installationId, connected: true as const };
       });
-      return { installationId: pending.installationId, connected: true };
+    }
     } catch (error) {
       await this.deps.runWithIdentity(identity, async () => {
         const current = await this.deps.installations.getConnectorInstallation(pending.installationId);
