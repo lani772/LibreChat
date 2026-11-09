@@ -10,6 +10,9 @@ export interface ConnectorCredentialDocument {
   encryptedPayload: string;
   /** Envelope format version; the active encryption key is deployment-managed. */
   keyVersion: 'gcm1';
+  /** Cross-process refresh lease; never contains provider credentials. */
+  refreshLeaseToken?: string | null;
+  refreshLeaseUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
