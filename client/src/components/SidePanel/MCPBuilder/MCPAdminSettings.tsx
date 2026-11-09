@@ -14,6 +14,10 @@ const permissions: PermissionConfig[] = [
     permission: Permissions.CONFIGURE_OBO,
     labelKey: 'com_ui_mcp_servers_allow_configure_obo',
   },
+  {
+    permission: Permissions.INVOKE_CONNECTORS,
+    labelKey: 'com_ui_mcp_servers_allow_invoke_connectors',
+  },
 ];
 
 const MCPAdminSettings = () => {
