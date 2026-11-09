@@ -17,6 +17,8 @@ export * from './pulls';
 export * from './auth';
 /* API Keys */
 export * from './apiKeys';
+/* Connectors */
+export * from './connectors';
 /* MCP */
 export * from './mcp/mcpConfig';
 export * from './mcp/capabilities';
