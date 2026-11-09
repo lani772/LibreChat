@@ -10,6 +10,15 @@ interface OAuthStateVerifierEnvelope {
   ciphertext: string;
 }
 
+interface OAuthStateVerifierContext {
+  stateHash: string;
+  tenantId: string;
+  principalId: string;
+  installationId: string;
+  redirectUri: string;
+  expiresAt: number;
+}
+
 function key(): Buffer {
   const value = process.env[KEY_ENV]?.trim();
   if (!value || !/^[a-f0-9]{64}$/i.test(value)) {
@@ -18,24 +27,28 @@ function key(): Buffer {
   return Buffer.from(value, 'hex');
 }
 
-function aad(context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number }): Buffer {
-  return Buffer.from(JSON.stringify([
-    'google-oauth-pkce-verifier',
-    context.stateHash,
-    context.tenantId,
-    context.principalId,
-    context.installationId,
-    context.redirectUri,
-    context.expiresAt,
-  ]));
+function aad(context: OAuthStateVerifierContext): Buffer {
+  return Buffer.from(
+    JSON.stringify([
+      'google-oauth-pkce-verifier',
+      context.stateHash,
+      context.tenantId,
+      context.principalId,
+      context.installationId,
+      context.redirectUri,
+      context.expiresAt,
+    ]),
+  );
 }
 
 /** Encrypt PKCE verifier with a dedicated key and transaction-bound AAD. */
 export function encryptGoogleOAuthVerifier(
   verifier: string,
-  context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number },
+  context: OAuthStateVerifierContext,
 ): string {
-  if (!verifier || verifier.length > 256) throw new Error('Invalid Google OAuth PKCE verifier');
+  if (!verifier || verifier.length > 256) {
+    throw new Error('Invalid Google OAuth PKCE verifier');
+  }
   const nonce = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key(), nonce);
   cipher.setAAD(aad(context));
@@ -51,7 +64,7 @@ export function encryptGoogleOAuthVerifier(
 
 export function decryptGoogleOAuthVerifier(
   serialized: string,
-  context: { stateHash: string; tenantId: string; principalId: string; installationId: string; redirectUri: string; expiresAt: number },
+  context: OAuthStateVerifierContext,
 ): string {
   let envelope: OAuthStateVerifierEnvelope;
   try {
