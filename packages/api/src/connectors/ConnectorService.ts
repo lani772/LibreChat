@@ -1,5 +1,9 @@
 import { getTenantId, getUserId } from '@librechat/data-schemas';
-import type { ConnectorInstallationDocument } from '@librechat/data-schemas';
+import type {
+  ConnectorInstallationDocument,
+  RecordAuditEntryInput,
+  RecordAuditEntryOptions,
+} from '@librechat/data-schemas';
 import {
   authorizeConnectorInvocation,
   type ConnectorAccessDeniedReason,
@@ -146,4 +150,39 @@ export class ConnectorService {
       throw new ConnectorAccessError();
     }
   }
+}
+
+
+/**
+ * Adapts LibreChat's append-only, hash-chained audit writer to connector events.
+ * failClosed is mandatory: connector operations never proceed without a durable
+ * allow record, and denied attempts are also persisted where possible.
+ */
+export function createConnectorAuditWriter(
+  recordAuditEntry: (
+    input: RecordAuditEntryInput,
+    options?: RecordAuditEntryOptions,
+  ) => Promise<unknown>,
+): NonNullable<ConnectorServiceDependencies['audit']> {
+  return async (event) => {
+    await recordAuditEntry(
+      {
+        action: 'mcp.tool_invoked',
+        outcome: event.outcome === 'allowed' ? 'success' : 'denied',
+        severity: event.outcome === 'allowed' ? 'info' : 'warning',
+        actor: { type: 'user', id: event.principalId, name: event.principalId },
+        target: {
+          type: 'connector',
+          id: event.installationId,
+          name: event.provider,
+        },
+        tenantId: event.tenantId,
+        metadata: {
+          provider: event.provider,
+          ...(event.reason ? { reason: event.reason } : {}),
+        },
+      },
+      { failClosed: true },
+    );
+  };
 }
