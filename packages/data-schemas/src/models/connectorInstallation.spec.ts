@@ -280,11 +280,14 @@ describe('connector installation persistence', () => {
     );
     expect(stored?.state).toBe('revoked');
     expect(stored?.credentialRef).toBeNull();
-    expect(
-      await mongoose.models.ConnectorCredential.countDocuments({
-        installationId: String(created._id),
-      }),
-    ).toBe(0);
+    const credentialCount = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'user-a' },
+      async () =>
+        mongoose.models.ConnectorCredential.countDocuments({
+          installationId: String(created._id),
+        }),
+    );
+    expect(credentialCount).toBe(0);
   });
 
   it('requires a tenant context when strict isolation is enabled', async () => {
