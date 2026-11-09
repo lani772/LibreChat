@@ -20,7 +20,7 @@ export interface ConnectorServiceDependencies {
     principalId: string;
   }) => Promise<ConnectorPrincipalPermissions>;
   /** Receives identifiers and outcome only; never credentials or message content. */
-  audit?: (event: {
+  audit: (event: {
     action: 'connector.invoke';
     tenantId: string;
     principalId: string;
@@ -126,7 +126,6 @@ export class ConnectorService {
     outcome: 'allowed' | 'denied';
     reason?: ConnectorAccessDeniedReason | 'not_found' | 'permission_lookup_failed';
   }): Promise<void> {
-    if (!this.deps.audit) return;
     try {
       await this.deps.audit(event);
     } catch {
