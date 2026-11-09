@@ -31,6 +31,65 @@ function sendDriveError(res, error) {
   return res.status(502).json({ error: 'Google Drive is temporarily unavailable' });
 }
 
+/** Lists only installations owned by the authenticated principal in the active tenant. */
+router.get('/google-workspace', loginLimiter, requireJwtAuth, async (req, res) => {
+  setNoStoreHeaders(res);
+  const tenantId = getTenantId();
+  const principalId = getUserId();
+  if (!tenantId || !principalId) {
+    return res.status(404).json({ error: 'Connector installations are unavailable' });
+  }
+  try {
+    const installations = await db.listConnectorInstallations({
+      ownerUserId: principalId,
+      provider: 'google-workspace',
+      limit: 50,
+    });
+    return res.status(200).json({
+      installations: installations.map((installation) => ({
+        id: installation._id.toString(),
+        displayName: installation.displayName,
+        provider: installation.provider,
+        visibility: installation.visibility,
+        state: installation.state,
+        lastConnectedAt: installation.lastConnectedAt || null,
+        lastErrorCode: installation.lastErrorCode || null,
+        version: installation.version,
+      })),
+    });
+  } catch {
+    return res.status(503).json({ error: 'Connector installations are temporarily unavailable' });
+  }
+});
+
+/** Creates a disconnected personal installation; owner identity comes from trusted context. */
+router.post('/google-workspace', loginLimiter, requireJwtAuth, requireSameOrigin, async (req, res) => {
+  setNoStoreHeaders(res);
+  const tenantId = getTenantId();
+  const principalId = getUserId();
+  const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+  if (!tenantId || !principalId || !displayName || displayName.length > 120) {
+    return res.status(400).json({ error: 'A connector name between 1 and 120 characters is required' });
+  }
+  try {
+    const installation = await db.createConnectorInstallation({
+      provider: 'google-workspace',
+      displayName,
+      visibility: 'personal',
+    });
+    return res.status(201).json({
+      id: installation._id.toString(),
+      displayName: installation.displayName,
+      provider: installation.provider,
+      visibility: installation.visibility,
+      state: installation.state,
+      version: installation.version,
+    });
+  } catch {
+    return res.status(503).json({ error: 'Unable to create Google Workspace connection' });
+  }
+});
+
 router.get(
   '/google-workspace/:installationId/status',
   loginLimiter,
