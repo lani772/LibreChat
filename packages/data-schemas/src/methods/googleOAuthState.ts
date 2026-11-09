@@ -45,7 +45,8 @@ export function createGoogleOAuthStateMethods(
       tenantId,
       principalId,
       installationId: input.installationId,
-      redirectUri: redirect.toString(),
+      // Preserve the exact configured URI: Google requires it to match at token exchange.
+      redirectUri: input.redirectUri,
       encryptedCodeVerifier: input.encryptedCodeVerifier,
       expiresAt: input.expiresAt,
     });
