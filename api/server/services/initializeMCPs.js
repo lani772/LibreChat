@@ -15,6 +15,7 @@ const {
   GoogleWorkspaceOAuthAdapter,
   GoogleWorkspaceOAuthFlow,
   GoogleWorkspaceTokenLifecycle,
+  GoogleDriveReadOnlyConnector,
   encryptGoogleOAuthVerifier,
   decryptGoogleOAuthVerifier,
   createConnectorAuditWriter,
@@ -36,6 +37,7 @@ const db = require('~/models');
 let connectorCredentialVault;
 let googleWorkspaceOAuthFlow;
 let googleWorkspaceTokenLifecycle;
+let googleDriveReadOnlyConnector;
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -82,14 +84,12 @@ function withPluginServers(configured) {
 
   const merged = { ...configured };
   for (const name of names) {
-    /** Own-property check: an inherited member like `toString` is not a conflict. */
     if (Object.hasOwn(merged, name)) {
       logger.warn(
         `[MCP] Plugin server "${name}" conflicts with a configured server and was skipped.`,
       );
       continue;
     }
-    /** Defined rather than assigned so a name like `__proto__` cannot reach a setter. */
     Object.defineProperty(merged, name, {
       value: pluginServers[name],
       enumerable: true,
@@ -100,9 +100,6 @@ function withPluginServers(configured) {
   return merged;
 }
 
-/**
- * Initialize MCP servers
- */
 async function initializeMCPs() {
   const appConfig = await getAppConfig({ baseOnly: true });
   const mcpServers = withPluginServers(appConfig.mcpConfig);
@@ -129,23 +126,17 @@ async function initializeMCPs() {
     throw error;
   }
 
-  /** Runs alongside the connections below. It never rejects, so a failed start leaves no unhandled rejection. */
   const tombstoneReport = reportStoredMCPTombstones(
     (fieldPath) => db.listConfigTombstones(fieldPath),
     appConfig?.mcpConfig,
   );
 
   try {
-    // Connector authorization is request-scoped: these adapters read trusted tenant/user
-    // AsyncLocalStorage context inside each MCP discovery and execution request.
     const connectorService = new ConnectorService({
       installations: {
         getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
       },
       resolvePrincipalPermissions: createTenantConnectorPermissionResolver({
-        // Both reads execute under the request's trusted tenant AsyncLocalStorage context.
-        // getPartitionRole bypasses the shared role cache so permission revocation applies
-        // to the next discovery/execution authorization check.
         getUserById: (principalId, fields) => db.getUserById(principalId, fields),
         getPartitionRole: (roleName) => db.getPartitionRole(roleName),
       }),
@@ -177,7 +168,6 @@ async function initializeMCPs() {
       /^[a-f\d]{64}$/i.test(process.env.CONNECTOR_CREDENTIALS_KEY || '')
     ) {
       try {
-        // These constraints are security-critical even when MONGO_AUTO_INDEX is disabled.
         await mongoose.models.GoogleOAuthState.createIndexes();
         const adapter = new GoogleWorkspaceOAuthAdapter({
           clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
@@ -248,9 +238,15 @@ async function initializeMCPs() {
               db.revokeConnectorInstallation(installationId),
           },
         });
+        googleDriveReadOnlyConnector = new GoogleDriveReadOnlyConnector({
+          connectors: connectorService,
+          tokenLifecycle: googleWorkspaceTokenLifecycle,
+          vault: connectorCredentialVault,
+        });
       } catch {
         googleWorkspaceOAuthFlow = undefined;
         googleWorkspaceTokenLifecycle = undefined;
+        googleDriveReadOnlyConnector = undefined;
         logger.warn(
           '[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.',
         );
@@ -258,6 +254,7 @@ async function initializeMCPs() {
     } else {
       googleWorkspaceOAuthFlow = undefined;
       googleWorkspaceTokenLifecycle = undefined;
+      googleDriveReadOnlyConnector = undefined;
     }
 
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
@@ -313,4 +310,5 @@ module.exports = initializeMCPs;
 module.exports.getConnectorCredentialVault = () => connectorCredentialVault;
 module.exports.getGoogleWorkspaceOAuthFlow = () => googleWorkspaceOAuthFlow;
 module.exports.getGoogleWorkspaceTokenLifecycle = () => googleWorkspaceTokenLifecycle;
+module.exports.getGoogleDriveReadOnlyConnector = () => googleDriveReadOnlyConnector;
 module.exports.refreshChangedServerTools = refreshChangedServerTools;
