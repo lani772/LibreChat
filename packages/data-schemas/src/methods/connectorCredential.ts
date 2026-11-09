@@ -127,7 +127,6 @@ export function createConnectorCredentialMethods(
     leaseUntil: Date;
   }): Promise<boolean> {
     const tenantId = requireTenant();
-    const ownerUserId = getUserId();
     if (!mongoose.isValidObjectId(input.installationId) || !input.leaseToken) return false;
     const now = new Date();
     const result = await Credential.updateOne(
@@ -150,7 +149,6 @@ export function createConnectorCredentialMethods(
     leaseToken: string;
   }): Promise<boolean> {
     const tenantId = requireTenant();
-    const ownerUserId = getUserId();
     if (!mongoose.isValidObjectId(input.installationId)) return false;
     const result = await Credential.updateOne(
       { installationId: input.installationId, tenantId, refreshLeaseToken: input.leaseToken },
