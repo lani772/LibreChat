@@ -158,7 +158,7 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [x] Add an authorized vault service that decrypts only inside `ConnectorService.execute()` after authorization and durable audit.
 - [x] Delete encrypted credential rows when an installation is revoked; include the collection in tenant index migration.
 - [x] Add tests for authenticated encryption, tamper detection, context binding, size limits, owner checks, tenant isolation, authorized reads, and revocation cleanup.
-- [ ] Implement KMS/HSM-backed key management and automated key rotation/re-encryption.
+- [x] Add versioned multi-key credential encryption with legacy-envelope compatibility.\n- [ ] Integrate KMS/HSM-backed key custody and complete fleet-wide credential re-encryption.
 - [x] Implement Google Workspace refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect; concrete provider API adapters remain outstanding.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
 
@@ -192,7 +192,7 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [x] Add just-in-time refresh coordination, remote revocation orchestration, and local disconnect lifecycle handling.
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
-The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. Just-in-time refresh, refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect are implemented. The first Google Drive metadata tool and frontend connection UI are implemented. Scheduled background refresh and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
+The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. Just-in-time refresh, refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect are implemented. The first Google Drive metadata tool and frontend connection UI are implemented. Scheduled background refresh, durable remote-revocation retry, KMS/HSM-backed key custody, and fleet-wide key re-encryption remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
 
 
 ### Google Workspace OAuth orchestration — implementation progress
@@ -204,7 +204,7 @@ The token adapter and orchestration flow are wired to authenticated HTTP initiat
 - [x] Persist access/refresh tokens only through ConnectorCredentialVault and mark the installation connected with version-checked transition.
 - [x] Add unit tests for state creation/hash-only storage, ownership denial, PKCE exchange, encrypted vault handoff, replay rejection, revoked installation, and malformed callback input.
 - [x] Implement the durable MongoDB state collection with a unique state-hash index, encrypted PKCE verifier bound to tenant/principal/installation/redirect/expiry metadata, TTL cleanup, and atomic find-and-delete consume.
-- [x] Wire authenticated same-origin POST initiation, a public state-correlated callback, and an owner-only safe status endpoint; apply rate limiting, fixed redirect URI, and state-consuming provider cancellation. Frontend connection UI/status presentation remains outstanding.
+- [x] Wire authenticated same-origin POST initiation, a public state-correlated callback, and an owner-only safe status endpoint; apply rate limiting, fixed redirect URI, and state-consuming provider cancellation. The Google Workspace connection UI and status presentation are implemented.
 - [x] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
 - [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
 
@@ -221,9 +221,9 @@ The orchestration service is wired to the production MongoDB state store, startu
 - [x] Make local revocation and encrypted credential cleanup retryable; report whether remote revocation was confirmed or remains pending.
 - [x] Add tests for token refresh, refresh-token preservation, lease contention, stale-lease fencing, invalid grants, remote revocation failure, and disconnect authorization.
 - [ ] Run the focused Jest suites, data-schema package tests, typechecks, lint, and integration tests in a configured checkout.
-- [x] Implement Google Drive read-only API operations, model-callable agent/assistant tool registration, and user-facing connection UI.\n- [ ] Implement production KMS/HSM key management and durable remote-revocation retry.
+- [x] Implement Google Drive read-only API operations, model-callable agent/assistant tool registration, and user-facing connection UI.\n- [x] Implement versioned multi-key credential envelope support with legacy decryption compatibility.\n- [ ] Implement production KMS/HSM key management, fleet-wide re-encryption, and durable remote-revocation retry.
 
-The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. This milestone does not yet implement Google Drive/Gmail API tools or a frontend connection interface.
+The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. Google Drive metadata search/retrieval and its connection interface are implemented; Gmail integration is not part of this milestone.
 
 
 ### Google Drive read-only metadata connector — implementation progress
@@ -237,7 +237,7 @@ The token lifecycle service is wired during MCP initialization and exposed only 
 - [x] Add focused connector, tool-loader, HTTP-route, and UI tests.
 - [ ] Execute focused Jest suites, frontend tests, package typechecks, lint, and full regression tests in a dependency-enabled checkout.
 - [ ] Run live OAuth and Drive metadata checks using a dedicated Google test account.
-- [ ] Add durable remote-revocation retry and managed KMS/HSM key management before production onboarding.
+- [ ] Add durable remote-revocation retry and managed KMS/HSM key custody with a fleet-wide re-encryption job before production onboarding.
 
 No live Google OAuth test or local test execution has been performed. Tests are committed as source but are not evidence of passing behavior.
  
