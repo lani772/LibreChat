@@ -1275,7 +1275,7 @@ router.post(
       const user = req.user;
       const tenantId = getTenantId();
       const { installationId } = req.params;
-      if (!user?.id || !tenantId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+      if (!user?.id || !tenantId || !/^[a-f\d]{24}$/i.test(installationId)) {
         return res.status(400).json({ error: 'Invalid connector authorization request' });
       }
       const flow = getGoogleWorkspaceOAuthFlow();
@@ -1343,7 +1343,7 @@ router.get('/connectors/google/:installationId/status', requireJwtAuth, async (r
     const user = req.user;
     const tenantId = getTenantId();
     const { installationId } = req.params;
-    if (!user?.id || !tenantId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+    if (!user?.id || !tenantId || !/^[a-f\d]{24}$/i.test(installationId)) {
       return res.status(400).json({ error: 'Invalid connector status request' });
     }
     const installation = await db.getConnectorInstallation(installationId);
