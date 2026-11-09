@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { tenantStorage } from '~/config/tenantContext';
 import { createConnectorInstallationModel } from './connectorInstallation';
+import { createConnectorCredentialModel } from './connectorCredential';
 import { createMCPServerModel } from './mcpServer';
 import { _resetStrictCache } from './plugins/tenantIsolation';
 import { createConnectorInstallationMethods } from '~/methods/connectorInstallation';
@@ -12,6 +13,7 @@ beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
   createConnectorInstallationModel(mongoose);
+  createConnectorCredentialModel(mongoose);
   createMCPServerModel(mongoose);
 });
 
@@ -25,6 +27,7 @@ describe('connector installation persistence', () => {
 
   beforeEach(async () => {
     await mongoose.models.ConnectorInstallation.deleteMany({});
+    await mongoose.models.ConnectorCredential.deleteMany({});
   });
 
   it('stamps tenant scope and never exposes credential references in list results', async () => {
