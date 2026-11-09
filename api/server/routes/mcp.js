@@ -91,7 +91,6 @@ const {
 const { createOpenIDSessionTokenProvider } = require('~/server/services/OpenIDSessionRefresh');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
-const { getGoogleWorkspaceOAuthFlow } = require('~/server/services/initializeMCPs');
 
 const router = Router();
 
@@ -1258,119 +1257,6 @@ router.get('/:serverName/auth-values', requireJwtAuth, checkMCPUsePermissions, a
 });
 
 
-
-// --- SaaS connector OAuth routes ---
-
-/**
- * Start a Google Workspace OAuth transaction for an installation owned by the
- * authenticated principal. Tenant and principal identifiers come only from
- * the trusted request context; request bodies cannot override them.
- */
-router.post(
-  '/connectors/google/:installationId/oauth/start',
-  requireJwtAuth,
-  mcpAppAdmissionLimiter,
-  async (req, res) => {
-    try {
-      const user = req.user;
-      const tenantId = getTenantId();
-      const { installationId } = req.params;
-      if (!user?.id || !tenantId || !/^[a-f\d]{24}$/i.test(installationId)) {
-        return res.status(400).json({ error: 'Invalid connector authorization request' });
-      }
-      const flow = getGoogleWorkspaceOAuthFlow();
-      if (!flow) {
-        return res.status(503).json({ error: 'Google Workspace OAuth is not configured' });
-      }
-      const result = await flow.begin({
-        identity: { tenantId, principalId: user.id },
-        installationId,
-      });
-      return res.status(201).json({
-        authorizationUrl: result.authorizationUrl,
-        expiresAt: result.expiresAt.toISOString(),
-      });
-    } catch (error) {
-      logger.warn('[Connectors] Google Workspace authorization could not be started', {
-        error: error?.name || 'Error',
-      });
-      return res.status(400).json({ error: 'Unable to start Google Workspace authorization' });
-    }
-  },
-);
-
-/**
- * Google redirects here after consent. The one-time state record—not callback
- * query parameters—restores the tenant and principal context.
- */
-router.get('/connectors/google/oauth/callback', mcpAppAdmissionLimiter, async (req, res) => {
-  const { state, code, error: providerError } = req.query;
-  if (typeof state !== 'string') {
-    return res.status(400).json({ error: 'Invalid Google OAuth callback' });
-  }
-  const flow = getGoogleWorkspaceOAuthFlow();
-  if (!flow) {
-    return res.status(503).json({ error: 'Google Workspace OAuth is not configured' });
-  }
-  try {
-    if (typeof providerError === 'string') {
-      const consumed = await flow.cancel({ state });
-      if (!consumed) {
-        return res.status(400).json({ error: 'OAuth transaction is invalid or expired' });
-      }
-      return res.status(200).json({ success: false, cancelled: true });
-    }
-    if (typeof code !== 'string') {
-      return res.status(400).json({ error: 'Invalid Google OAuth callback' });
-    }
-    const result = await flow.complete({ state, code });
-    return res.status(200).json({ success: true, installationId: result.installationId });
-  } catch (error) {
-    logger.warn('[Connectors] Google Workspace OAuth callback failed', {
-      error: error?.name || 'Error',
-    });
-    return res.status(400).json({ error: 'Google Workspace authorization failed or expired' });
-  }
-});
-
-
-/**
- * Return only safe connection metadata for an owned Google Workspace installation.
- * Credential references, encrypted payloads, and provider tokens are never serialized.
- */
-router.get('/connectors/google/:installationId/status', requireJwtAuth, async (req, res) => {
-  try {
-    const user = req.user;
-    const tenantId = getTenantId();
-    const { installationId } = req.params;
-    if (!user?.id || !tenantId || !/^[a-f\d]{24}$/i.test(installationId)) {
-      return res.status(400).json({ error: 'Invalid connector status request' });
-    }
-    const installation = await db.getConnectorInstallation(installationId);
-    if (
-      !installation ||
-      installation.tenantId !== tenantId ||
-      installation.ownerUserId !== user.id ||
-      installation.provider !== 'google-workspace'
-    ) {
-      return res.status(404).json({ error: 'Connector installation not found' });
-    }
-    return res.json({
-      installationId,
-      provider: installation.provider,
-      displayName: installation.displayName,
-      state: installation.state,
-      lastConnectedAt: installation.lastConnectedAt ?? null,
-      lastErrorCode: installation.lastErrorCode ?? null,
-      version: installation.version,
-    });
-  } catch (error) {
-    logger.warn('[Connectors] Google Workspace status lookup failed', {
-      error: error?.name || 'Error',
-    });
-    return res.status(500).json({ error: 'Unable to retrieve connector status' });
-  }
-});
 
 /**
 MCP Server CRUD Routes (User-Managed MCP Servers)
