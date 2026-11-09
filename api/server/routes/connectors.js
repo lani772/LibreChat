@@ -36,7 +36,7 @@ router.post(
     const tenantId = getTenantId();
     const principalId = getUserId();
     const { installationId } = req.params;
-    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+    if (!tenantId || !principalId || !/^[a-f\d]{24}$/i.test(installationId)) {
       return res.status(403).json({ error: 'Connector authorization is unavailable' });
     }
     try {
