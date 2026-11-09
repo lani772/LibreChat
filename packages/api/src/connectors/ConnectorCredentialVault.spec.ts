@@ -86,7 +86,7 @@ describe('ConnectorCredentialVault', () => {
       encryptedPayload: JSON.stringify(envelope),
       keyVersion: 'gcm1',
     });
-    connectorService.execute.mockImplementation(async (_id, callback) =>
+    execute.mockImplementation(async (_id, callback) =>
       callback({
         tenantId: 'tenant-a',
         principalId: 'user-a',
