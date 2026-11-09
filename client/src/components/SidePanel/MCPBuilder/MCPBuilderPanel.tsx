@@ -116,6 +116,7 @@ export default function MCPBuilderPanel() {
         skeleton={<MCPServerCardSkeleton />}
         className="px-3 pb-3"
       >
+        <GoogleWorkspaceConnections />
         <MCPServerList
           servers={filteredServers}
           getServerStatusIconProps={getServerStatusIconProps}
