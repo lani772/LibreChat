@@ -41,6 +41,18 @@ describe('Google OAuth PKCE verifier encryption', () => {
         installationId: '64b000000000000000000002',
       }),
     ).toThrow();
+    expect(() =>
+      decryptGoogleOAuthVerifier(envelope, {
+        ...context,
+        redirectUri: 'https://attacker.example.test/callback',
+      }),
+    ).toThrow();
+    expect(() =>
+      decryptGoogleOAuthVerifier(envelope, {
+        ...context,
+        expiresAt: context.expiresAt + 1000,
+      }),
+    ).toThrow();
   });
 
   it('fails closed when the independent state key is absent or malformed', () => {
