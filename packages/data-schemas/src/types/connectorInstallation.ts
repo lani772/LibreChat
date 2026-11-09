@@ -1,3 +1,5 @@
+import type { Types } from 'mongoose';
+
 export const CONNECTOR_INSTALLATION_STATES = [
   'disconnected',
   'authorizing',
@@ -17,8 +19,6 @@ export type ConnectorInstallationVisibility = 'personal' | 'tenant';
  * implemented; this field must never contain secret material. instanceKey is an internal opaque identifier, not an account
  * name, email address, phone number, or provider-issued secret.
  */
-import type { Types } from 'mongoose';
-
 export interface ConnectorInstallationDocument {
   _id: Types.ObjectId;
   tenantId?: string;
