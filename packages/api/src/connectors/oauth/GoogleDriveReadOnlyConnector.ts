@@ -119,7 +119,7 @@ export class GoogleDriveReadOnlyConnector {
       throw new GoogleDriveReadOnlyError('Drive page token is invalid', 'INVALID_RESPONSE', 400);
     }
 
-    return this.deps.connectors.execute(input.installationId, async (connector) => {
+    return this.deps.connectors.execute(input.installationId, async (_connector) => {
       await this.assertReadOnlyScope(input.installationId);
       const accessToken = await this.deps.tokenLifecycle.getAccessToken(input.installationId);
       const url = new URL(`${DRIVE_API}/files`);
