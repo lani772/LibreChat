@@ -66,7 +66,7 @@ export function createConnectorInstallationMethods(
   mongoose: typeof import('mongoose'),
 ): ConnectorInstallationMethods {
   const Model = mongoose.models.ConnectorInstallation as Model<ConnectorInstallationDocument>;
-  const MCPServer = mongoose.models.MCPServer as Model<import('~/types').MCPServerDocument>;
+  const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
 
   async function createConnectorInstallation(
     input: CreateConnectorInstallationInput,
@@ -133,7 +133,11 @@ export function createConnectorInstallationMethods(
   }): Promise<ConnectorInstallationDocument | null> {
     requireConnectorTenant('MCP server binding');
     const principalId = getUserId();
-    if (!principalId || !mongoose.isValidObjectId(params.installationId) || !mongoose.isValidObjectId(params.mcpServerId)) {
+    if (
+      !principalId ||
+      !mongoose.isValidObjectId(params.installationId) ||
+      !mongoose.isValidObjectId(params.mcpServerId)
+    ) {
       return null;
     }
     if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
