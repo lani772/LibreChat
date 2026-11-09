@@ -1546,17 +1546,17 @@ Please follow these instructions when using tools from the respective MCP server
   }): Promise<t.FormattedToolResponse> {
     if (scheduledBearerInvocation) requestScopedConnections = scheduledBearerInvocation.context;
     const userId = user?.id;
+    const enforceSchedule =
+      scheduledMCPInvocation != null && scheduledMCPInvocation.enrolled !== false;
+    const capabilityProfile = resolveMCPClientCapabilityProfile(mcpApps);
+    const logPrefix = userId ? `[MCP][User: ${userId}][${serverName}]` : `[MCP][${serverName}]`;
+    this.bindRequestScopedConnectionStore(requestScopedConnections);
     // Reauthorize a pre-resolved MCP config before connection checkout. The config's dbId is
     // trusted server metadata; model-supplied names and tool arguments are never binding keys.
     const connectorConfig = providedConfig ?? (await this.getPrincipalServerConfig(serverName, user));
     if (connectorConfig && this.connectorAuthorizationGuard) {
       await this.connectorAuthorizationGuard(connectorConfig);
     }
-    const enforceSchedule =
-      scheduledMCPInvocation != null && scheduledMCPInvocation.enrolled !== false;
-    const capabilityProfile = resolveMCPClientCapabilityProfile(mcpApps);
-    const logPrefix = userId ? `[MCP][User: ${userId}][${serverName}]` : `[MCP][${serverName}]`;
-    this.bindRequestScopedConnectionStore(requestScopedConnections);
     let recoveryTakeoverConsumed = false;
     const directBearerRecoveryState: t.DirectBearerRecoveryState = { attempted: false };
     while (true) {
