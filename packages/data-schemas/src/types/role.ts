@@ -58,6 +58,7 @@ export interface IRole extends Document {
       [Permissions.CREATE]?: boolean;
       [Permissions.SHARE]?: boolean;
       [Permissions.SHARE_PUBLIC]?: boolean;
+      [Permissions.INVOKE_CONNECTORS]?: boolean;
     };
     [PermissionTypes.REMOTE_AGENTS]?: {
       [Permissions.USE]?: boolean;
