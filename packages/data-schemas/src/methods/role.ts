@@ -1,5 +1,7 @@
 import {
   CacheKeys,
+  PermissionTypes,
+  Permissions,
   SystemRoles,
   roleDefaults,
   permissionsSchema,
@@ -253,11 +255,39 @@ export function createRoleMethods(
         .lean<IRole>()
         .exec();
     const role = await read();
-    if (role || !systemRoleValues.has(roleName)) {
+    const normalizedRoleName = roleName.toUpperCase();
+    if (role) {
+      /**
+       * Existing tenant copies of the built-in roles predate connector invocation.
+       * Backfill only this new field using the built-in role's explicit default;
+       * custom roles remain denied when the field is absent. The update filter
+       * retains the active tenant partition and the read is uncached.
+       */
+      if (systemRoleValues.has(normalizedRoleName)) {
+        const defaultConnectorPermission =
+          roleDefaults[normalizedRoleName as keyof typeof roleDefaults].permissions[
+            PermissionTypes.MCP_SERVERS
+          ][Permissions.INVOKE_CONNECTORS];
+        const currentConnectorPermission =
+          role.permissions?.[PermissionTypes.MCP_SERVERS]?.[Permissions.INVOKE_CONNECTORS];
+        if (currentConnectorPermission == null) {
+          await Role.updateOne(roleDocumentFilter(roleName, 'getPartitionRole'), {
+            $set: {
+              'permissions.MCP_SERVERS.INVOKE_CONNECTORS': defaultConnectorPermission,
+            },
+          });
+          return read();
+        }
+      }
       return role;
     }
+    if (!systemRoleValues.has(normalizedRoleName)) {
+      return null;
+    }
     try {
-      const created = await new Role(roleDefaults[roleName as keyof typeof roleDefaults]).save();
+      const created = await new Role(
+        roleDefaults[normalizedRoleName as keyof typeof roleDefaults],
+      ).save();
       return created.toObject() as IRole;
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
