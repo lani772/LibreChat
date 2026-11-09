@@ -47,6 +47,7 @@ const {
   manifestToolMap,
   // Basic Tools
   GoogleSearchAPI,
+  GoogleDrive,
   // Structured Tools
   FluxAPI,
   OpenWeather,
@@ -157,6 +158,7 @@ const loadTools = async ({
     'azure-ai-search': StructuredACS,
     traversaal_search: TraversaalSearch,
     tavily_search_results_json: TavilySearchResults,
+    google_drive: GoogleDrive,
   };
 
   const customConstructors = {
