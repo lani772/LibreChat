@@ -65,14 +65,24 @@ describe('connector credential persistence', () => {
       provider: 'chatwoot',
       credentialPresent: true,
     });
-    const ordinaryRead = await mongoose.models.ConnectorCredential.findOne({
-      installationId: String(installation._id),
-    }).lean();
+    const ordinaryRead = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'owner-a' },
+      async () =>
+        mongoose.models.ConnectorCredential.findOne({
+          installationId: String(installation._id),
+        }).lean(),
+    );
     expect(ordinaryRead?.encryptedPayload).toBeUndefined();
 
-    const raw = await mongoose.models.ConnectorCredential.findOne({
-      installationId: String(installation._id),
-    }).select('+encryptedPayload').lean();
+    const raw = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'owner-a' },
+      async () =>
+        mongoose.models.ConnectorCredential.findOne({
+          installationId: String(installation._id),
+        })
+          .select('+encryptedPayload')
+          .lean(),
+    );
     expect(raw?.encryptedPayload).toBe(ciphertext);
     expect(JSON.stringify(summary)).not.toContain(ciphertext);
   });
