@@ -38,6 +38,11 @@ export interface ConnectorInstallationMethods {
     lastErrorCode?: string;
   }): Promise<ConnectorInstallationDocument | null>;
   revokeConnectorInstallation(installationId: string): Promise<boolean>;
+  updateConnectorInstallationGrants(params: {
+    installationId: string;
+    expectedVersion: number;
+    principalIds: string[];
+  }): Promise<ConnectorInstallationDocument | null>;
 }
 
 const ALLOWED_TRANSITIONS: Record<ConnectorInstallationState, readonly ConnectorInstallationState[]> = {
@@ -172,11 +177,45 @@ export function createConnectorInstallationMethods(
     return result.modifiedCount === 1;
   }
 
+
+  async function updateConnectorInstallationGrants(params: {
+    installationId: string;
+    expectedVersion: number;
+    principalIds: string[];
+  }): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('grant update');
+    if (!mongoose.isValidObjectId(params.installationId)) return null;
+    if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
+      throw new Error('Invalid connector installation version');
+    }
+    if (!Array.isArray(params.principalIds) || params.principalIds.length > 100) {
+      throw new Error('Connector grants must contain no more than 100 principals');
+    }
+    const principalIds = [...new Set(params.principalIds.map((id) => id.trim()))];
+    if (principalIds.some((id) => !id || id.length > 128)) {
+      throw new Error('Invalid connector grant principal identifier');
+    }
+
+    return Model.findOneAndUpdate(
+      {
+        _id: params.installationId,
+        visibility: 'personal',
+        version: params.expectedVersion,
+      },
+      { $set: { grantedPrincipalIds: principalIds }, $inc: { version: 1 } },
+      { new: true, runValidators: true },
+    )
+      .select('-credentialRef')
+      .lean<ConnectorInstallationDocument>()
+      .exec();
+  }
+
   return {
     createConnectorInstallation,
     getConnectorInstallation,
     listConnectorInstallations,
     transitionConnectorInstallation,
     revokeConnectorInstallation,
+    updateConnectorInstallationGrants,
   };
 }
