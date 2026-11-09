@@ -61,7 +61,7 @@ describe('GoogleWorkspaceTokenLifecycle', () => {
     expect(vault.claimRefreshLease).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439011',
       'lease-token',
-      30_000,
+      120_000,
     );
     expect(vault.storeCredentials).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439011',
