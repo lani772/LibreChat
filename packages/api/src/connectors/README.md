@@ -20,7 +20,7 @@ The trusted binding guard is now injected into the existing MCPManager. It resol
 
 The production resolver verifies the principal through the tenant-isolated User model and reads the role from the active tenant partition without using the shared role cache. It checks `MCP_SERVERS.INVOKE_CONNECTORS` on every authorization attempt, so a role change takes effect on the next discovery or tool call. The permission is separate from `MCP_SERVERS.USE`: general MCP use does not implicitly authorize tenant-shared connector use. The new permission defaults to false for the USER role and true for ADMIN; custom roles must be explicitly granted it. Personal connector owners and explicitly granted principals still require tenant membership and connected state.
 
-This guard protects MCP discovery and execution. The first provider OAuth lifecycle slice now includes a typed adapter contract and a Google Workspace token-endpoint adapter for authorization-code exchange, refresh, and revocation. It deliberately does not add routes or begin OAuth redirects yet.
+This guard protects MCP discovery and execution. Google Workspace OAuth now has a provider-neutral adapter contract, a token-endpoint adapter, a tenant-bound orchestration service, and authenticated HTTP initiation/status routes plus a public state-correlated callback. The callback consumes a durable one-time state record, restores the trusted tenant/principal context, exchanges the authorization code with S256 PKCE, and writes tokens only through ConnectorCredentialVault. The start and callback endpoints are rate-limited; the status endpoint returns only safe installation metadata.
 
 ## Protected credential vault
 
