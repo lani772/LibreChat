@@ -1,6 +1,10 @@
 import { tenantStorage } from '@librechat/data-schemas';
 import type { ConnectorInstallationDocument } from '@librechat/data-schemas';
-import { ConnectorAccessError, ConnectorService } from './ConnectorService';
+import {
+  ConnectorAccessError,
+  ConnectorService,
+  createConnectorAuditWriter,
+} from './ConnectorService';
 
 const installation = (overrides: Partial<ConnectorInstallationDocument> = {}) =>
   ({
@@ -48,6 +52,36 @@ function setup({
     run: <T>(fn: () => Promise<T>) => tenantStorage.run({ tenantId, userId: principalId }, fn),
   };
 }
+
+describe('Connector audit adapter', () => {
+  it('writes tenant-scoped, fail-closed audit records without secret material', async () => {
+    const recordAuditEntry = jest.fn().mockResolvedValue(undefined);
+    const writer = createConnectorAuditWriter(recordAuditEntry);
+    await writer({
+      action: 'connector.invoke',
+      tenantId: 'tenant-a',
+      principalId: 'user-a',
+      installationId: 'installation-a',
+      provider: 'google-workspace',
+      outcome: 'denied',
+      reason: 'not_owner_or_granted',
+    });
+    expect(recordAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'mcp.tool_invoked',
+        outcome: 'denied',
+        tenantId: 'tenant-a',
+        actor: { type: 'user', id: 'user-a', name: 'user-a' },
+        target: { type: 'connector', id: 'installation-a', name: 'google-workspace' },
+        metadata: { provider: 'google-workspace', reason: 'not_owner_or_granted' },
+      }),
+      { failClosed: true },
+    );
+    const serialized = JSON.stringify(recordAuditEntry.mock.calls[0][0]);
+    expect(serialized).not.toContain('credentialRef');
+    expect(serialized).not.toContain('token');
+  });
+});
 
 describe('ConnectorService', () => {
   it('uses trusted tenant and user context', async () => {
