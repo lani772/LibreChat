@@ -70,7 +70,7 @@ export function createConnectorCredentialMethods(
       $set: {
         tenantId,
         installationId: input.installationId,
-        ...(ownerUserId ? { ownerUserId } : {}),
+        ...(input.refreshLeaseToken ? {} : { ownerUserId }),
         provider,
         encryptedPayload: input.encryptedPayload,
         keyVersion: input.keyVersion,
