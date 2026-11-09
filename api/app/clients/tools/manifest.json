@@ -167,5 +167,12 @@
         "optional": true
       }
     ]
+  },
+  {
+    "name": "Google Drive",
+    "pluginKey": "google_drive",
+    "description": "Search your connected Google Drive and retrieve file metadata. Read-only; no file contents or modifications.",
+    "icon": "assets/google-drive.svg",
+    "authConfig": []
   }
 ]
