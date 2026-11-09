@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
+const db = require('~/models');
 const { requireJwtAuth, requireSameOrigin, loginLimiter } = require('~/server/middleware');
 const { getGoogleWorkspaceOAuthFlow } = require('~/server/services/initializeMCPs');
 
@@ -17,6 +18,41 @@ function clientResultUrl(result) {
   url.searchParams.set('googleWorkspace', result);
   return url.toString();
 }
+
+/**
+ * Return only the authenticated owner's safe connection status; never return credential metadata.
+ */
+router.get('/google-workspace/:installationId/status', loginLimiter, requireJwtAuth, async (req, res) => {
+  setNoStoreHeaders(res);
+  const tenantId = getTenantId();
+  const principalId = getUserId();
+  const { installationId } = req.params;
+  if (!tenantId || !principalId || !/^[a-f\d]{24}$/i.test(installationId)) {
+    return res.status(404).json({ error: 'Connector installation is unavailable' });
+  }
+  try {
+    const installation = await db.getConnectorInstallation(installationId);
+    if (
+      !installation ||
+      installation.tenantId !== tenantId ||
+      installation.ownerUserId !== principalId ||
+      installation.provider !== 'google-workspace'
+    ) {
+      return res.status(404).json({ error: 'Connector installation is unavailable' });
+    }
+    return res.status(200).json({
+      id: installation._id.toString(),
+      displayName: installation.displayName,
+      provider: installation.provider,
+      visibility: installation.visibility,
+      state: installation.state,
+      lastConnectedAt: installation.lastConnectedAt || null,
+      lastErrorCode: installation.lastErrorCode || null,
+    });
+  } catch {
+    return res.status(404).json({ error: 'Connector installation is unavailable' });
+  }
+});
 
 /**
  * Start connector authorization only from an authenticated, same-origin browser request.
