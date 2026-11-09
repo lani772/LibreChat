@@ -85,32 +85,37 @@ export class GoogleWorkspaceTokenLifecycle {
           if (!claimed) throw new RefreshLeaseBusyError();
 
           try {
-            // Read credentials again under the lease: another process may have refreshed
-            // between the initial read and this process acquiring the lease.
-            const latestAccess = requiredCredential(credentials, 'accessToken');
-            const latestExpiry = Number(credentials.expiresAt);
-            if (
-              Number.isFinite(latestExpiry) &&
-              latestExpiry > this.now() + ACCESS_TOKEN_REFRESH_SKEW_MS
-            ) {
-              return latestAccess;
-            }
-            const refreshed = await this.deps.adapter.refreshAccessToken({ refreshToken });
-            const nextRefreshToken = refreshed.refreshToken || refreshToken;
-            await this.deps.vault.storeCredentials(
-              installationId,
-              'google-workspace',
-              {
-                ...credentials,
-                accessToken: refreshed.accessToken,
-                refreshToken: nextRefreshToken,
-                expiresAt: refreshed.expiresAt,
-                scopes: refreshed.scopes.length > 0 ? refreshed.scopes : credentials.scopes,
-                tokenType: refreshed.tokenType,
-              },
-              { refreshLeaseToken: leaseToken },
-            );
-            return refreshed.accessToken;
+            // Re-read inside a fresh authorized vault operation after acquiring the
+            // distributed lease. The original snapshot may predate another process's refresh.
+            return this.deps.vault.withCredentials(installationId, async (latestCredentials) => {
+              const latestAccess = requiredCredential(latestCredentials, 'accessToken');
+              const latestExpiry = Number(latestCredentials.expiresAt);
+              if (
+                Number.isFinite(latestExpiry) &&
+                latestExpiry > this.now() + ACCESS_TOKEN_REFRESH_SKEW_MS
+              ) {
+                return latestAccess;
+              }
+              const latestRefreshToken = requiredCredential(latestCredentials, 'refreshToken');
+              const refreshed = await this.deps.adapter.refreshAccessToken({
+                refreshToken: latestRefreshToken,
+              });
+              const nextRefreshToken = refreshed.refreshToken || latestRefreshToken;
+              await this.deps.vault.storeCredentials(
+                installationId,
+                'google-workspace',
+                {
+                  ...latestCredentials,
+                  accessToken: refreshed.accessToken,
+                  refreshToken: nextRefreshToken,
+                  expiresAt: refreshed.expiresAt,
+                  scopes: refreshed.scopes.length > 0 ? refreshed.scopes : latestCredentials.scopes,
+                  tokenType: refreshed.tokenType,
+                },
+                { refreshLeaseToken: leaseToken },
+              );
+              return refreshed.accessToken;
+            });
           } finally {
             await this.deps.vault.releaseRefreshLease(installationId, leaseToken).catch(() => false);
           }
