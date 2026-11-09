@@ -71,7 +71,13 @@ export class ConnectorCredentialVault {
   ): Promise<TResult> {
     return this.connectors.execute(installationId, async (authorized) => {
       const stored = await this.store.getConnectorCredentialCiphertext(installationId);
-      if (!stored || stored.provider !== authorized.installation.provider) {
+      if (
+        !stored ||
+        stored.tenantId !== authorized.tenantId ||
+        stored.installationId !== installationId ||
+        stored.provider !== authorized.installation.provider ||
+        stored.keyVersion !== 'gcm1'
+      ) {
         throw new Error('Connector credentials are unavailable');
       }
       const envelope = JSON.parse(stored.encryptedPayload) as ConnectorCredentialEnvelope;
