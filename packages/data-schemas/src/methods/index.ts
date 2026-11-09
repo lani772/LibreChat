@@ -623,6 +623,7 @@ export type {
   AgentApiKeyMethods,
   MCPServerMethods,
   ConnectorInstallationMethods,
+  ConnectorCredentialMethods,
   CodeEnvironmentMethods,
   UserGroupMethods,
   AclEntryMethods,
