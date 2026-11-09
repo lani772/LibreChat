@@ -16,8 +16,10 @@ export type ConnectorInstallationVisibility = 'personal' | 'tenant';
  * credential store. instanceKey is an internal opaque identifier, not an account
  * name, email address, phone number, or provider-issued secret.
  */
+import type { Types } from 'mongoose';
+
 export interface ConnectorInstallationDocument {
-  _id: string;
+  _id: Types.ObjectId;
   tenantId?: string;
   ownerUserId: string;
   provider: string;
