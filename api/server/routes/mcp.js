@@ -1269,6 +1269,7 @@ router.get('/:serverName/auth-values', requireJwtAuth, checkMCPUsePermissions, a
 router.post(
   '/connectors/google/:installationId/oauth/start',
   requireJwtAuth,
+  mcpAppAdmissionLimiter,
   async (req, res) => {
     try {
       const user = req.user;
@@ -1302,7 +1303,7 @@ router.post(
  * Google redirects here after consent. The one-time state record—not callback
  * query parameters—restores the tenant and principal context.
  */
-router.get('/connectors/google/oauth/callback', async (req, res) => {
+router.get('/connectors/google/oauth/callback', mcpAppAdmissionLimiter, async (req, res) => {
   const { state, code, error: providerError } = req.query;
   if (typeof state !== 'string') {
     return res.status(400).json({ error: 'Invalid Google OAuth callback' });
