@@ -188,11 +188,11 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [x] Add focused adapter tests for exchange, missing refresh token, refresh without token rotation, safe errors, idempotent revocation, and missing configuration.
 - [x] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
 - [x] Connect authorization-code exchange and subsequent token refresh/rotation to ConnectorCredentialVault; never expose tokens to the model or ordinary API responses.
-- [ ] Define least-privilege Google Workspace scopes and implement the first read-only provider API tool.
+- [x] Define the least-privilege Drive metadata scope and implement the first read-only Google Drive API tool.
 - [x] Add just-in-time refresh coordination, remote revocation orchestration, and local disconnect lifecycle handling.
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
-The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. Just-in-time refresh, refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect are implemented. The first provider API tool, frontend connection UI, scheduled background refresh, and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
+The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. Just-in-time refresh, refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect are implemented. The first Google Drive metadata tool and frontend connection UI are implemented. Scheduled background refresh and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
 
 
 ### Google Workspace OAuth orchestration — implementation progress
@@ -221,7 +221,7 @@ The orchestration service is wired to the production MongoDB state store, startu
 - [x] Make local revocation and encrypted credential cleanup retryable; report whether remote revocation was confirmed or remains pending.
 - [x] Add tests for token refresh, refresh-token preservation, lease contention, stale-lease fencing, invalid grants, remote revocation failure, and disconnect authorization.
 - [ ] Run the focused Jest suites, data-schema package tests, typechecks, lint, and integration tests in a configured checkout.
-- [ ] Implement Google Workspace API read-only tools, user-facing connection UI, and production KMS/HSM key management.
+- [x] Implement Google Drive read-only API operations, model-callable agent/assistant tool registration, and user-facing connection UI.\n- [ ] Implement production KMS/HSM key management and durable remote-revocation retry.
 
 The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. This milestone does not yet implement Google Drive/Gmail API tools or a frontend connection interface.
 
@@ -239,7 +239,7 @@ The token lifecycle service is wired during MCP initialization and exposed only 
 - [ ] Add frontend connector discovery/consent/status UI and integration tests against a configured Google test account.
 - [ ] Run Jest, package typecheck, lint, and full regression suites in a dependency-enabled checkout.
 
-The Google Drive adapter intentionally does not download or mutate files. `GOOGLE_WORKSPACE_SCOPES` must include `https://www.googleapis.com/auth/drive.metadata.readonly`; existing installations that did not grant this scope must reconnect to consent to it. No tests or typechecks have been executed in this environment.
+The Google Drive adapter and model-callable tool intentionally do not download or mutate files. `GOOGLE_WORKSPACE_SCOPES` must include `https://www.googleapis.com/auth/drive.metadata.readonly`; existing installations that did not grant this scope must reconnect to consent to it. Tests and typechecks have not been executed in this environment.
 
 
 ### Google Workspace connection UI and model-callable Drive tool — implementation progress
