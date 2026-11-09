@@ -75,7 +75,6 @@ export class GoogleWorkspaceTokenLifecycle {
             return accessToken;
           }
 
-          const refreshToken = requiredCredential(credentials, 'refreshToken');
           const leaseToken = this.newLeaseToken();
           const claimed = await this.deps.vault.claimRefreshLease(
             installationId,
