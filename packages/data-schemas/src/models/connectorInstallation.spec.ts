@@ -118,6 +118,36 @@ describe('connector installation persistence', () => {
     ).rejects.toThrow('Invalid connector state transition');
   });
 
+  it('persists explicit personal-connector grants with optimistic concurrency', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace',
+        displayName: 'Workspace',
+        visibility: 'personal',
+      }),
+    );
+    const updated = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'user-a' },
+      async () =>
+        methods().updateConnectorInstallationGrants({
+          installationId: String(created._id),
+          expectedVersion: 0,
+          principalIds: ['user-b', 'user-b', 'user-c'],
+        }),
+    );
+    expect(updated?.grantedPrincipalIds).toEqual(['user-b', 'user-c']);
+    expect(updated?.version).toBe(1);
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+        methods().updateConnectorInstallationGrants({
+          installationId: String(created._id),
+          expectedVersion: 0,
+          principalIds: ['user-d'],
+        }),
+      ),
+    ).resolves.toBeNull();
+  });
+
   it('refuses unscoped creation even when global tenant strict mode is disabled', async () => {
     await expect(
       methods().createConnectorInstallation({
