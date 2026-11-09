@@ -21,13 +21,27 @@ The credential reference is excluded from ordinary reads and list results. The c
 - State transitions use an expected version and compare-and-set update to reject stale concurrent writes.
 - Revocation changes state to revoked, clears the credential pointer, and increments the version.
 
+## Trusted MCP server binding
+
+A connector installation can be bound to a database-backed LibreChat MCP server through `mcpServerId`, which stores the immutable MongoDB `MCPServer` record ID corresponding to `ParsedServerConfig.dbId`. The binding method:
+
+- Requires trusted tenant and authenticated-user context.
+- Confirms the MCP server record belongs to the authenticated user in the active tenant.
+- Confirms the connector installation belongs to that same user.
+- Uses the installation version for compare-and-set updates.
+- Enforces one connector installation per MCP server within a tenant.
+- Exposes a tenant-scoped lookup by MCP server ID without returning `credentialRef`.
+
+This binding currently covers database-backed MCP server records. Operator/YAML/plugin servers do not have a user-owned `MCPServer` record and must not be implicitly treated as connector-backed.
+
 ## Security boundary still to implement
 
 This is the persistence layer, not a complete connector service. API/service entry points must still:
 1. Resolve tenant and principal from trusted authentication middleware.
 2. Apply authorizeConnectorInvocation and owner/visibility policy before reads, updates, credential resolution, or execution.
 3. Implement a protected credential adapter and provider-specific revoke/rotation behavior.
-4. Invalidate MCP connection and tool caches on disconnect, revoke, or permission changes.
-5. Add redacted audit events.
+4. Enforce this binding in MCP discovery and tool execution using the trusted `dbId` from the resolved server config; this runtime guard is not wired yet.
+5. Invalidate MCP connection and tool caches on disconnect, revoke, or permission changes.
+6. Add redacted audit events.
 
 Do not expose raw data methods directly as public HTTP endpoints or model-callable tools.
