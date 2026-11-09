@@ -80,6 +80,7 @@ export default function GoogleWorkspaceConnections() {
       }
       window.location.assign(target.toString());
     } catch (err) {
+      await refresh();
       setError(err instanceof Error ? err.message : 'Unable to start Google authorization.');
       setBusyId(null);
     }
