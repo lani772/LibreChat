@@ -4,7 +4,7 @@ import type { ParsedServerConfig } from '../mcp/types';
 export type ConnectorMCPAuthorizationGuard = (serverConfig: ParsedServerConfig) => Promise<void>;
 
 export interface ConnectorMCPAuthorizationGuardDependencies {
-  /** Tenant-scoped lookup keyed only by the trusted MCPServer database ID. */
+  /** Minimal cross-tenant binding-existence lookup keyed only by the trusted MCPServer database ID. */
   findInstallationByMCPServerId: (
     mcpServerId: string,
   ) => Promise<Pick<ConnectorInstallationDocument, '_id'> | null>;
