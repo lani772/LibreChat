@@ -20,8 +20,14 @@ The trusted binding guard is now injected into the existing MCPManager. It resol
 
 The production resolver verifies the principal through the tenant-isolated User model and reads the role from the active tenant partition without using the shared role cache. It checks `MCP_SERVERS.INVOKE_CONNECTORS` on every authorization attempt, so a role change takes effect on the next discovery or tool call. The permission is separate from `MCP_SERVERS.USE`: general MCP use does not implicitly authorize tenant-shared connector use. The new permission defaults to false for the USER role and true for ADMIN; custom roles must be explicitly granted it. Personal connector owners and explicitly granted principals still require tenant membership and connected state.
 
-This guard protects MCP discovery and execution. It does not yet provide the credential vault, provider-specific credential retrieval/revocation, or direct first-party provider execution adapters. Those remain separate implementation milestones.
+This guard protects MCP discovery and execution. Provider-specific OAuth handshakes, refresh-token rotation, and direct first-party provider execution adapters remain separate integration work.
 
-## Credential handling
+## Protected credential vault
 
-credentialRef remains an opaque pointer only. No vault adapter is implemented in this milestone. Never store credentials, OAuth codes, QR payloads, WhatsApp sessions, or other secret material in the installation record.
+Connector credentials are stored in the separate `connectorcredentials` collection, never in the connector installation document. The persistence layer stores only an encrypted envelope and safe metadata. Ciphertext is excluded from ordinary Mongoose projections; the internal ciphertext read method is intended to be called only inside `ConnectorCredentialVault.withCredentials()` after `ConnectorService.execute()` has authorized and audited the caller.
+
+New connector secrets use AES-256-GCM with a fresh 96-bit nonce per write. The tenant ID, installation ID, and provider are authenticated as additional data, so ciphertext cannot be transplanted between tenants, installations, or providers. Authentication-tag failure is fatal; there is no plaintext or legacy-cipher fallback. Payloads are limited to 64 KiB. The dedicated `CONNECTOR_CREDENTIALS_KEY` must be a 32-byte hexadecimal key supplied by the deployment secret manager; generate a value with `openssl rand -hex 32`. Do not commit the key or log it. Do not reuse `CREDS_KEY`.
+
+The new credential collection is included in the tenant index migration. Installation revocation marks the installation revoked before deleting its encrypted credential row; if cleanup fails, the revoked installation remains unusable and cleanup can be retried. Owner-only writes and deletes derive the owner from trusted request context. Authorized reads are tenant-scoped and are only exposed through the vault service.
+
+**Operational boundary:** this milestone establishes encrypted persistence and the authorized vault service. It does not yet implement a KMS/HSM-backed keyring, automated key rotation/re-encryption, provider OAuth refresh/revocation calls, or concrete Google Workspace/Chatwoot/n8n/WhatsApp adapters. Those must be completed before production provider credentials are onboarded. Never put OAuth codes, QR pairing payloads, or WhatsApp session material in connector installation records.
