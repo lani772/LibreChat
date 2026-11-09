@@ -38,7 +38,7 @@ export class ConnectorAccessError extends Error {
   }
 }
 export interface AuthorizedConnector {
-  installation: ConnectorInstallationDocument;
+  installation: Omit<ConnectorInstallationDocument, 'credentialRef'>;
   tenantId: string;
   principalId: string;
 }
@@ -62,7 +62,12 @@ export class ConnectorService {
 
   public async authorize(installationId: string): Promise<AuthorizedConnector> {
     const { tenantId, principalId } = this.getTrustedIdentity();
-    const installation = await this.deps.installations.getConnectorInstallation(installationId);
+    let installation: ConnectorInstallationDocument | null;
+    try {
+      installation = await this.deps.installations.getConnectorInstallation(installationId);
+    } catch {
+      throw new ConnectorAccessError();
+    }
     if (!installation || !installation.tenantId) {
       await this.writeAudit({
         action: 'connector.invoke', tenantId, principalId, installationId,
@@ -74,6 +79,12 @@ export class ConnectorService {
     let permissions: ConnectorPrincipalPermissions;
     try {
       permissions = await this.deps.resolvePrincipalPermissions({ tenantId, principalId });
+      if (
+        typeof permissions?.isTenantMember !== 'boolean' ||
+        typeof permissions?.canInvokeTenantConnector !== 'boolean'
+      ) {
+        throw new Error('Incomplete connector permission result');
+      }
     } catch {
       await this.writeAudit({
         action: 'connector.invoke', tenantId, principalId, installationId,
@@ -105,7 +116,9 @@ export class ConnectorService {
       action: 'connector.invoke', tenantId, principalId, installationId,
       provider: installation.provider, outcome: 'allowed',
     });
-    return { installation, tenantId, principalId };
+    const safeInstallation = { ...installation };
+    delete safeInstallation.credentialRef;
+    return { installation: safeInstallation, tenantId, principalId };
   }
 
   /** Callback (including credential lookup) is reached only after authorization and audit. */
