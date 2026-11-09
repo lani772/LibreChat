@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { Model } from 'mongoose';
-import { getTenantId, getUserId, SYSTEM_TENANT_ID } from '~/config/tenantContext';
+import { getTenantId, getUserId, runAsSystem, SYSTEM_TENANT_ID } from '~/config/tenantContext';
 import type {
   ConnectorInstallationDocument,
   ConnectorInstallationState,
@@ -29,6 +29,10 @@ export interface ConnectorInstallationMethods {
   getConnectorInstallationByMCPServerId(
     mcpServerId: string,
   ): Promise<ConnectorInstallationDocument | null>;
+  /** Internal existence lookup across tenant partitions; returns only the opaque installation ID. */
+  getConnectorInstallationBindingByMCPServerId(
+    mcpServerId: string,
+  ): Promise<Pick<ConnectorInstallationDocument, '_id'> | null>;
   bindConnectorInstallationToMCPServer(params: {
     installationId: string;
     mcpServerId: string;
@@ -124,6 +128,21 @@ export function createConnectorInstallationMethods(
       .select('-credentialRef')
       .lean<ConnectorInstallationDocument>()
       .exec();
+  }
+
+  /**
+   * Internal binding-existence lookup used by the MCP guard. It deliberately runs in the
+   * explicit system context so an installation bound in another tenant is still recognized
+   * and denied by ConnectorService, rather than mistaken for an ordinary unbound MCP server.
+   * Only the installation ID is returned; no tenant metadata or credential pointer escapes.
+   */
+  async function getConnectorInstallationBindingByMCPServerId(
+    mcpServerId: string,
+  ): Promise<Pick<ConnectorInstallationDocument, '_id'> | null> {
+    if (!mongoose.isValidObjectId(mcpServerId)) return null;
+    return runAsSystem(async () =>
+      Model.findOne({ mcpServerId }).select('_id').lean<Pick<ConnectorInstallationDocument, '_id'>>().exec(),
+    );
   }
 
   /** Bind only an MCP server record authored by the authenticated connector owner. */
@@ -274,6 +293,7 @@ export function createConnectorInstallationMethods(
     createConnectorInstallation,
     getConnectorInstallation,
     getConnectorInstallationByMCPServerId,
+    getConnectorInstallationBindingByMCPServerId,
     bindConnectorInstallationToMCPServer,
     listConnectorInstallations,
     transitionConnectorInstallation,
