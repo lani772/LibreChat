@@ -20,7 +20,7 @@ const connectorInstallationSchema = new Schema<ConnectorInstallationDocument>(
     // OAuth codes, QR payloads, or WhatsApp session material in this document.
     credentialRef: { type: String, select: false },
     // Binds this connector to a database-backed MCP server by immutable record ID.
-    mcpServerId: { type: String, match: /^[a-f\\d]{24}$/i },
+    mcpServerId: { type: String, match: /^[a-f\d]{24}$/i },
     grantedPrincipalIds: { type: [String], default: [] },
     lastConnectedAt: { type: Date },
     lastErrorCode: { type: String, maxlength: 80 },
