@@ -5,6 +5,7 @@ const { requireJwtAuth, requireSameOrigin, loginLimiter } = require('~/server/mi
 const {
   getGoogleWorkspaceOAuthFlow,
   getGoogleWorkspaceTokenLifecycle,
+  getGoogleDriveReadOnlyConnector,
 } = require('~/server/services/initializeMCPs');
 
 const router = Router();
@@ -22,9 +23,14 @@ function clientResultUrl(result) {
   return url.toString();
 }
 
-/**
- * Return only the authenticated owner's safe connection status; never return credential metadata.
- */
+function sendDriveError(res, error) {
+  const status = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
+  if (status === 400) return res.status(400).json({ error: 'Invalid Google Drive request' });
+  if (status === 403) return res.status(403).json({ error: 'Google Drive read permission is required' });
+  if (status === 404) return res.status(404).json({ error: 'Google Drive resource is unavailable' });
+  return res.status(502).json({ error: 'Google Drive is temporarily unavailable' });
+}
+
 router.get(
   '/google-workspace/:installationId/status',
   loginLimiter,
@@ -62,10 +68,57 @@ router.get(
   },
 );
 
-/**
- * Start connector authorization only from an authenticated, same-origin browser request.
- * The installation owner and tenant are read from trusted AsyncLocalStorage context.
- */
+/** Read-only metadata listing; the connector service performs trusted tenant/owner authorization. */
+router.get(
+  '/google-workspace/:installationId/drive/files',
+  loginLimiter,
+  requireJwtAuth,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const drive = getGoogleDriveReadOnlyConnector();
+    if (!drive) return res.status(503).json({ error: 'Google Drive connector is not configured' });
+    const pageSize = req.query.pageSize === undefined ? undefined : Number(req.query.pageSize);
+    const query = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const pageToken = typeof req.query.pageToken === 'string' ? req.query.pageToken : undefined;
+    const allowedOrder = ['name', 'modifiedTime', 'createdTime', 'name_natural'];
+    const orderBy = typeof req.query.orderBy === 'string' && allowedOrder.includes(req.query.orderBy)
+      ? req.query.orderBy : undefined;
+    try {
+      const result = await drive.listFiles({
+        installationId: req.params.installationId,
+        ...(query !== undefined ? { query } : {}),
+        ...(pageSize !== undefined ? { pageSize } : {}),
+        ...(pageToken !== undefined ? { pageToken } : {}),
+        ...(orderBy !== undefined ? { orderBy } : {}),
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      return sendDriveError(res, error);
+    }
+  },
+);
+
+/** Retrieves metadata only; file content and export/download endpoints are intentionally absent. */
+router.get(
+  '/google-workspace/:installationId/drive/files/:fileId',
+  loginLimiter,
+  requireJwtAuth,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const drive = getGoogleDriveReadOnlyConnector();
+    if (!drive) return res.status(503).json({ error: 'Google Drive connector is not configured' });
+    try {
+      const file = await drive.getFile({
+        installationId: req.params.installationId,
+        fileId: req.params.fileId,
+      });
+      return res.status(200).json(file);
+    } catch (error) {
+      return sendDriveError(res, error);
+    }
+  },
+);
+
 router.post(
   '/google-workspace/:installationId/authorize',
   loginLimiter,
@@ -93,16 +146,11 @@ router.post(
         expiresAt: result.expiresAt.toISOString(),
       });
     } catch {
-      // Do not expose installation existence, ownership, state, or provider details.
       return res.status(404).json({ error: 'Connector authorization is unavailable' });
     }
   },
 );
 
-/**
- * Disconnect is owner-only and same-origin. Local access is revoked even when
- * Google's remote revocation endpoint is temporarily unavailable.
- */
 router.delete(
   '/google-workspace/:installationId/disconnect',
   loginLimiter,
@@ -144,16 +192,11 @@ router.delete(
   },
 );
 
-/**
- * Public OAuth callback. State is the sole correlation credential; tenant and principal
- * are recovered from the atomically consumed server-side state record.
- */
+/** Public callback: one-time state is the sole correlation credential. */
 router.get('/google-workspace/callback', loginLimiter, async (req, res) => {
   setNoStoreHeaders(res);
   const flow = getGoogleWorkspaceOAuthFlow();
-  if (!flow) {
-    return res.redirect(302, clientResultUrl('failed'));
-  }
+  if (!flow) return res.redirect(302, clientResultUrl('failed'));
 
   const state = typeof req.query.state === 'string' ? req.query.state : '';
   const providerError = typeof req.query.error === 'string' ? req.query.error : '';
@@ -161,17 +204,12 @@ router.get('/google-workspace/callback', loginLimiter, async (req, res) => {
     await flow.cancel({ state }).catch(() => false);
     return res.redirect(302, clientResultUrl('failed'));
   }
-
   const code = typeof req.query.code === 'string' ? req.query.code : '';
-  if (!state || !code) {
-    return res.redirect(302, clientResultUrl('failed'));
-  }
-
+  if (!state || !code) return res.redirect(302, clientResultUrl('failed'));
   try {
     await flow.complete({ state, code });
     return res.redirect(302, clientResultUrl('connected'));
   } catch {
-    // OAuth codes, state values, tokens, and provider response bodies are never logged.
     return res.redirect(302, clientResultUrl('failed'));
   }
 });
