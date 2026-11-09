@@ -38,6 +38,30 @@ export const googleSearchSchema: ExtendedJsonSchema = {
   required: ['query'],
 };
 
+/** Google Drive read-only tool JSON schema */
+export const googleDriveSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    action: {
+      type: 'string',
+      enum: ['search_files', 'get_file_metadata'],
+      description: 'Search Drive files or retrieve metadata for one file.',
+    },
+    query: {
+      type: 'string',
+      description: 'Google Drive query expression, such as name contains \'budget\'.',
+    },
+    fileId: { type: 'string', description: 'File ID for get_file_metadata.' },
+    installationId: {
+      type: 'string',
+      description: 'Optional owned Google Workspace connection ID. Omit when only one connected account exists.',
+    },
+    pageSize: { type: 'integer', minimum: 1, maximum: 100 },
+    pageToken: { type: 'string' },
+  },
+  required: ['action'],
+};
+
 /** Flux API tool JSON schema */
 export const fluxApiSchema: ExtendedJsonSchema = {
   type: 'object',
@@ -302,6 +326,12 @@ export const fileSearchSchema: ExtendedJsonSchema = {
 
 /** Tool definitions registry - maps tool names to their definitions */
 export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
+  google_drive: {
+    name: 'google_drive',
+    description: 'Search the connected Google Drive and retrieve file metadata. Read-only.',
+    schema: googleDriveSchema,
+    toolType: 'builtin',
+  },
   google: {
     name: 'google',
     description:
