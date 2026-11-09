@@ -151,6 +151,7 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [x] Add `MCP_SERVERS.INVOKE_CONNECTORS` to LibreChat's existing role permission schema, typed role model, and role defaults. It is separate from general MCP server use; USER defaults to denied and ADMIN defaults to allowed.
 - [x] Expose the permission in the existing MCP role settings UI and validate updates with the existing MCP permission schema.
 - [x] Resolve the authenticated user's current tenant role on every authorization check without shared role-cache reads; permission changes apply to the next discovery/tool call.
+- [x] Backfill the new permission on existing tenant copies of the built-in ADMIN/USER roles using tenant-partitioned updates; custom roles with no explicit grant remain denied.
 - [x] Add focused tests for allowed/denied roles, missing/malformed role data, cross-tenant users, lookup failures, and immediate permission revocation.
 - [ ] Implement the protected credential vault and provider-specific credential lookup/revocation adapters.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
