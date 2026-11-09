@@ -228,20 +228,19 @@ The token lifecycle service is wired during MCP initialization and exposed only 
 
 ### Google Drive read-only metadata connector — implementation progress
 
-- [x] Add a Google Drive API adapter using fixed `www.googleapis.com/drive/v3` endpoints and GET-only requests.
-- [x] Implement file listing/search with bounded pagination and metadata-only field masks.
-- [x] Implement single-file metadata retrieval with encoded file IDs.
-- [x] Require the actual granted `drive.metadata.readonly` OAuth scope before provider dispatch.
-- [x] Reuse ConnectorService authorization/audit, encrypted credential vault, and GoogleWorkspaceTokenLifecycle token refresh.
-- [x] Add authenticated, no-store HTTP routes for file listing and metadata retrieval.
-- [x] Add focused unit and route tests for scope denial, authorization ordering, pagination, provider errors, and metadata-only responses.
-- [ ] Register the Drive operations as model-callable MCP/Agent tools through LibreChat's existing tool execution path.
-- [ ] Add frontend connector discovery/consent/status UI and integration tests against a configured Google test account.
-- [ ] Run Jest, package typecheck, lint, and full regression suites in a dependency-enabled checkout.
+- [x] Add the Google Drive API adapter using fixed Drive v3 endpoints and GET-only requests.
+- [x] Implement bounded file listing/search and metadata retrieval with allowlisted fields.
+- [x] Require the actual granted `drive.metadata.readonly` scope before provider dispatch.
+- [x] Reuse ConnectorService authorization/audit, encrypted credential storage, and token refresh.
+- [x] Add authenticated, no-store HTTP routes and the built-in `google_drive` agent/assistant tool.
+- [x] Add the Google Workspace account manager to the existing MCP Servers side panel.
+- [x] Add focused connector, tool-loader, HTTP-route, and UI tests.
+- [ ] Execute focused Jest suites, frontend tests, package typechecks, lint, and full regression tests in a dependency-enabled checkout.
+- [ ] Run live OAuth and Drive metadata checks using a dedicated Google test account.
+- [ ] Add durable remote-revocation retry and managed KMS/HSM key management before production onboarding.
 
-The Google Drive adapter and model-callable tool intentionally do not download or mutate files. `GOOGLE_WORKSPACE_SCOPES` must include `https://www.googleapis.com/auth/drive.metadata.readonly`; existing installations that did not grant this scope must reconnect to consent to it. Tests and typechecks have not been executed in this environment.
-
-
+No live Google OAuth test or local test execution has been performed. Tests are committed as source but are not evidence of passing behavior.
+ 
 ### Google Workspace connection UI and model-callable Drive tool — implementation progress
 
 - [x] Add owner-scoped create/list installation endpoints; derive tenant and owner from trusted request context.
