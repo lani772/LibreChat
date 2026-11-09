@@ -190,6 +190,16 @@ describe('Tool Handlers', () => {
   });
 
   describe('loadTools', () => {
+    it('registers the first-party Google Drive tool in the runtime loader', async () => {
+      const toolMap = await loadTools({
+        user: fakeUser._id.toString(),
+        tools: ['google_drive'],
+        returnMap: true,
+      });
+
+      expect(typeof toolMap.google_drive).toBe('function');
+    });
+
     let toolFunctions;
     let loadTool1;
     let loadTool2;
