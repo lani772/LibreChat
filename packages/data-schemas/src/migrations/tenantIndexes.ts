@@ -7,6 +7,7 @@ import { buildIndexWithRetry } from '~/utils/retry';
 import accessRoleSchema from '~/schema/accessRole';
 import mcpServerSchema from '~/schema/mcpServer';
 import connectorInstallationSchema from '~/schema/connectorInstallation';
+import connectorCredentialSchema from '~/schema/connectorCredential';
 import messageSchema from '~/schema/message';
 import presetSchema from '~/schema/preset';
 import agentSchema from '~/schema/agent';
@@ -29,6 +30,7 @@ const TENANT_SCHEMAS = {
   conversationtags: conversationTagSchema,
   mcpservers: mcpServerSchema,
   connectorinstallations: connectorInstallationSchema,
+  connectorcredentials: connectorCredentialSchema,
   files: fileSchema,
   groups: groupSchema,
   skillsyncstatuses: skillSyncStatusSchema,
