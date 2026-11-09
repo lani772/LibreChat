@@ -115,10 +115,10 @@ export default function GoogleWorkspaceConnections() {
         credentials: 'include',
         headers: { Accept: 'application/json' },
       });
-      const result = await readJson<{ remoteRevocation: 'confirmed' | 'pending' }>(response);
+      const result = await readJson<{ remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' }>(response);
       setMessage(result.remoteRevocation === 'confirmed'
         ? 'Google Workspace disconnected and remote revocation confirmed.'
-        : 'Local access is disabled. Google remote revocation is still pending.');
+        : result.remoteRevocation === 'pending'\n          ? 'Local access is disabled. Google remote revocation is still pending.'\n          : 'Local access is disabled. Remote revocation could not be attempted because credentials were unavailable.');
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to disconnect Google Workspace.');
@@ -179,14 +179,14 @@ export default function GoogleWorkspaceConnections() {
                   {busyId === installation.id ? 'Working…' : 'Authorize'}
                 </button>
               ) : null}
-              {installation.state === 'connected' ? (
+              {installation.state !== 'revoked' ? (
                 <button
                   type="button"
                   className="text-xs font-medium text-text-secondary underline disabled:opacity-50"
                   disabled={busyId === installation.id}
                   onClick={() => void disconnect(installation.id)}
                 >
-                  {busyId === installation.id ? 'Working…' : 'Disconnect'}
+                  {busyId === installation.id ? 'Working…' : installation.state === 'connected' ? 'Disconnect' : 'Remove'}
                 </button>
               ) : null}
             </div>
