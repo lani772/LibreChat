@@ -2,7 +2,10 @@ const express = require('express');
 const request = require('supertest');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
 const db = require('~/models');
-const { getGoogleWorkspaceOAuthFlow } = require('~/server/services/initializeMCPs');
+const {
+  getGoogleWorkspaceOAuthFlow,
+  getGoogleWorkspaceTokenLifecycle,
+} = require('~/server/services/initializeMCPs');
 
 jest.mock('@librechat/data-schemas', () => ({
   getTenantId: jest.fn(),
@@ -21,6 +24,7 @@ jest.mock('~/server/middleware', () => ({
 
 jest.mock('~/server/services/initializeMCPs', () => ({
   getGoogleWorkspaceOAuthFlow: jest.fn(),
+  getGoogleWorkspaceTokenLifecycle: jest.fn(),
 }));
 
 describe('Google Workspace connector routes', () => {
@@ -100,6 +104,49 @@ describe('Google Workspace connector routes', () => {
 
     expect(response.status).toBe(404);
     expect(response.body).not.toHaveProperty('state');
+  });
+
+  it('disconnects an owned installation and reports remote revocation status', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    const lifecycle = {
+      disconnect: jest.fn().mockResolvedValue({
+        disconnected: true,
+        remoteRevocation: 'pending',
+      }),
+    };
+    getGoogleWorkspaceTokenLifecycle.mockReturnValue(lifecycle);
+
+    const response = await request(app)
+      .delete('/api/connectors/google-workspace/507f1f77bcf86cd799439011/disconnect');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      disconnected: true,
+      remoteRevocation: 'pending',
+    });
+    expect(lifecycle.disconnect).toHaveBeenCalledWith('507f1f77bcf86cd799439011');
+  });
+
+  it('does not disconnect an installation owned by another user', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-b',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    const lifecycle = { disconnect: jest.fn() };
+    getGoogleWorkspaceTokenLifecycle.mockReturnValue(lifecycle);
+
+    const response = await request(app)
+      .delete('/api/connectors/google-workspace/507f1f77bcf86cd799439011/disconnect');
+
+    expect(response.status).toBe(404);
+    expect(lifecycle.disconnect).not.toHaveBeenCalled();
   });
 
   it('completes the public callback and redirects to a fixed client URL', async () => {
