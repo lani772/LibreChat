@@ -224,3 +224,19 @@ The orchestration service is wired to the production MongoDB state store, startu
 - [ ] Implement Google Workspace API read-only tools, user-facing connection UI, and production KMS/HSM key management.
 
 The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. This milestone does not yet implement Google Drive/Gmail API tools or a frontend connection interface.
+
+
+### Google Drive read-only metadata connector — implementation progress
+
+- [x] Add a Google Drive API adapter using fixed `www.googleapis.com/drive/v3` endpoints and GET-only requests.
+- [x] Implement file listing/search with bounded pagination and metadata-only field masks.
+- [x] Implement single-file metadata retrieval with encoded file IDs.
+- [x] Require the actual granted `drive.metadata.readonly` OAuth scope before provider dispatch.
+- [x] Reuse ConnectorService authorization/audit, encrypted credential vault, and GoogleWorkspaceTokenLifecycle token refresh.
+- [x] Add authenticated, no-store HTTP routes for file listing and metadata retrieval.
+- [x] Add focused unit and route tests for scope denial, authorization ordering, pagination, provider errors, and metadata-only responses.
+- [ ] Register the Drive operations as model-callable MCP/Agent tools through LibreChat's existing tool execution path.
+- [ ] Add frontend connector discovery/consent/status UI and integration tests against a configured Google test account.
+- [ ] Run Jest, package typecheck, lint, and full regression suites in a dependency-enabled checkout.
+
+The Google Drive adapter intentionally does not download or mutate files. `GOOGLE_WORKSPACE_SCOPES` must include `https://www.googleapis.com/auth/drive.metadata.readonly`; existing installations that did not grant this scope must reconnect to consent to it. No tests or typechecks have been executed in this environment.
