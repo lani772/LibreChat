@@ -55,4 +55,5 @@ export * from './web';
 /* MCP Servers */
 export * from './mcp';
 export * from './mcpAuthority';
-\nexport * from './connectorInstallation';\n
+
+export * from './connectorInstallation';
