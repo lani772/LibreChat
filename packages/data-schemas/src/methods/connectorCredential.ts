@@ -40,6 +40,10 @@ export function createConnectorCredentialMethods(
   }): Promise<ConnectorCredentialSummary> {
     const tenantId = requireTenant();
     const ownerUserId = getUserId();
+    const provider = input.provider.trim().toLowerCase();
+    if (!/^[a-z][a-z0-9-]{1,63}$/.test(provider)) {
+      throw new Error('Invalid connector credential provider');
+    }
     if (!ownerUserId) throw new Error('Credential write requires an authenticated owner');
     if (!mongoose.isValidObjectId(input.installationId)) throw new Error('Invalid installation ID');
     if (!input.encryptedPayload || input.encryptedPayload.length > 100_000) {
@@ -48,7 +52,7 @@ export function createConnectorCredentialMethods(
     const installation = await Installation.findOne({
       _id: input.installationId,
       ownerUserId,
-      provider: input.provider,
+      provider,
       state: { $ne: 'revoked' },
     }).select('_id provider').lean<{ _id: unknown; provider: string }>().exec();
     if (!installation) throw new Error('Connector installation is unavailable');
@@ -60,7 +64,7 @@ export function createConnectorCredentialMethods(
           tenantId,
           installationId: input.installationId,
           ownerUserId,
-          provider: input.provider,
+          provider,
           encryptedPayload: input.encryptedPayload,
           keyVersion: input.keyVersion,
         },
