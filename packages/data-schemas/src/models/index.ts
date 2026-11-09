@@ -7,7 +7,7 @@ import { createOpenIDRefreshFlightModel } from './openidRefreshFlight';
 import { createAgentTriggerUserPurgeModel } from './triggerUserPurge';
 import { createRefreshTokenBridgeModel } from './refreshTokenBridge';
 import { createAgentTriggerDeliveryModel } from './triggerDelivery';
-import { createToolApprovalGrantModel } from './toolApprovalGrant';
+import { createToolApprovalGrantModel } from './toolApprovalGrant';\nimport { createConnectorInstallationModel } from './connectorInstallation';
 import { createSkillUploadIntentModel } from './skillUploadIntent';
 import { createSubagentContentModel } from './subagentContent';
 import { createSkillSyncStatusModel } from './skillSyncStatus';
@@ -57,7 +57,7 @@ import logger from '~/config/winston';
  */
 export function createModels(mongoose: typeof import('mongoose')): {
   User: ReturnType<typeof createUserModel>;
-  ToolApprovalGrant: ReturnType<typeof createToolApprovalGrantModel>;
+  ToolApprovalGrant: ReturnType<typeof createToolApprovalGrantModel>;\n  ConnectorInstallation: ReturnType<typeof createConnectorInstallationModel>;
   Token: ReturnType<typeof createTokenModel>;
   Session: ReturnType<typeof createSessionModel>;
   Passkey: ReturnType<typeof createPasskeyModel>;
@@ -112,7 +112,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
 } {
   const models = {
     User: createUserModel(mongoose),
-    ToolApprovalGrant: createToolApprovalGrantModel(mongoose),
+    ToolApprovalGrant: createToolApprovalGrantModel(mongoose),\n    ConnectorInstallation: createConnectorInstallationModel(mongoose),
     Token: createTokenModel(mongoose),
     Session: createSessionModel(mongoose),
     Passkey: createPasskeyModel(mongoose),
