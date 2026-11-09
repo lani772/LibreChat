@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { ConnectorCredentialVault, ConnectorCredentialValues } from '../ConnectorCredentialVault';
-import type { GoogleWorkspaceOAuthAdapter } from './GoogleWorkspaceOAuthAdapter';
+import { GoogleWorkspaceOAuthError, type GoogleWorkspaceOAuthAdapter } from './GoogleWorkspaceOAuthAdapter';
 
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 2 * 60 * 1000;
 const REFRESH_LEASE_MS = 30_000;
 const REFRESH_WAIT_MS = 250;
-const REFRESH_ATTEMPTS = 12;
+const REFRESH_ATTEMPTS = 60;
 
 class RefreshLeaseBusyError extends Error {
   constructor() {
@@ -123,7 +123,10 @@ export class GoogleWorkspaceTokenLifecycle {
       } catch (error) {
         if (!(error instanceof RefreshLeaseBusyError)) {
           const message = error instanceof Error ? error.message : '';
-          if (/invalid_grant|credentials require reconnection/i.test(message)) {
+          if (
+            (error instanceof GoogleWorkspaceOAuthError && error.code === 'invalid_grant') ||
+            /credentials require reconnection/i.test(message)
+          ) {
             await this.markReauthorizationRequired(installationId);
           }
           throw error;
