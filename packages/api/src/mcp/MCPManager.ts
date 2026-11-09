@@ -84,6 +84,7 @@ import { markMCPToolResultError } from './status';
 import { withMCPRequestSignal } from './signal';
 import { MCPConnection } from './connection';
 import { mcpConfig } from './mcpConfig';
+import type { ConnectorMCPAuthorizationGuard } from '../connectors/mcpGuard';
 
 function createOboToolCallErrorMessage(
   logPrefix: string,
@@ -160,6 +161,7 @@ export class MCPManager extends UserConnectionManager {
     catalogRecoveryMaxStateEntries?: number,
     catalogRecoveryMaxDetachedDiscoveries?: number,
     private readonly appBindingCodec: MCPAppBindingCodec | undefined = undefined,
+    private readonly connectorAuthorizationGuard?: ConnectorMCPAuthorizationGuard,
   ) {
     super();
     this.catalogRecoveryTracker = new MCPServerCatalogRecoveryTracker(
@@ -188,6 +190,7 @@ export class MCPManager extends UserConnectionManager {
       catalogRecoveryMaxStateEntries?: number;
       catalogRecoveryMaxDetachedDiscoveries?: number;
       appBindingCodec?: MCPAppBindingCodec;
+      connectorAuthorizationGuard?: ConnectorMCPAuthorizationGuard;
     },
   ): Promise<MCPManager> {
     if (MCPManager.instance) throw new Error('MCPManager has already been initialized.');
@@ -195,6 +198,7 @@ export class MCPManager extends UserConnectionManager {
       options?.catalogRecoveryMaxStateEntries,
       options?.catalogRecoveryMaxDetachedDiscoveries,
       options?.appBindingCodec,
+      options?.connectorAuthorizationGuard,
     );
     await MCPManager.instance.initialize(configs);
     return MCPManager.instance;
@@ -836,6 +840,9 @@ export class MCPManager extends UserConnectionManager {
           : MCPServerInspector.getToolCatalog(serverName, connection, options.deadlineMs, signal);
       const registry = MCPServersRegistry.getInstance();
       const effectiveConfig = serverConfig ?? (await registry.getServerConfig(serverName, userId));
+      if (effectiveConfig && this.connectorAuthorizationGuard) {
+        await this.connectorAuthorizationGuard(effectiveConfig);
+      }
       const useAppConnection =
         capabilityProfile === STANDARD_MCP_CAPABILITY_PROFILE &&
         effectiveConfig != null &&
@@ -1539,6 +1546,12 @@ Please follow these instructions when using tools from the respective MCP server
   }): Promise<t.FormattedToolResponse> {
     if (scheduledBearerInvocation) requestScopedConnections = scheduledBearerInvocation.context;
     const userId = user?.id;
+    // Reauthorize a pre-resolved MCP config before connection checkout. The config's dbId is
+    // trusted server metadata; model-supplied names and tool arguments are never binding keys.
+    const connectorConfig = providedConfig ?? (await this.getPrincipalServerConfig(serverName, user));
+    if (connectorConfig && this.connectorAuthorizationGuard) {
+      await this.connectorAuthorizationGuard(connectorConfig);
+    }
     const enforceSchedule =
       scheduledMCPInvocation != null && scheduledMCPInvocation.enrolled !== false;
     const capabilityProfile = resolveMCPClientCapabilityProfile(mcpApps);
@@ -1951,6 +1964,11 @@ Please follow these instructions when using tools from the respective MCP server
         }
 
         const requestTool = async () => {
+          // The installation can be revoked or disconnected after checkout; recheck immediately
+          // before every upstream tools/call request (including retries).
+          if (this.connectorAuthorizationGuard) {
+            await this.connectorAuthorizationGuard(declaredConfig);
+          }
           if (isScheduledMCPBearer(requestScopedConnections) && directBearerRecovery) {
             if (!scheduledBearerInvocation)
               throw new ScheduledMCPBearerError('tool_policy_denied', serverName);
