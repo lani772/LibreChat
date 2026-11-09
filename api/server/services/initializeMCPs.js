@@ -11,6 +11,7 @@ const {
   createMCPAppBindingCodec,
   createMCPPolicyResolver,
   ConnectorService,
+  ConnectorCredentialVault,
   createConnectorAuditWriter,
   createConnectorMCPAuthorizationGuard,
   createTenantConnectorPermissionResolver,
@@ -26,6 +27,8 @@ const {
 } = require('./Config/mcp');
 const { createMCPServersRegistry, createMCPManager } = require('~/config');
 const db = require('~/models');
+
+let connectorCredentialVault;
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -141,6 +144,17 @@ async function initializeMCPs() {
       }),
       audit: createConnectorAuditWriter((input, options) => db.recordAuditEntry(input, options)),
     });
+    connectorCredentialVault = new ConnectorCredentialVault(
+      {
+        putConnectorCredential: (input) => db.putConnectorCredential(input),
+        getConnectorCredentialCiphertext: (installationId) =>
+          db.getConnectorCredentialCiphertext(installationId),
+        deleteConnectorCredential: (installationId) =>
+          db.deleteConnectorCredential(installationId),
+      },
+      connectorService,
+    );
+
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
       findInstallationByMCPServerId: (mcpServerId) =>
         db.getConnectorInstallationBindingByMCPServerId(mcpServerId),
@@ -191,4 +205,5 @@ async function initializeMCPs() {
 }
 
 module.exports = initializeMCPs;
+module.exports.getConnectorCredentialVault = () => connectorCredentialVault;
 module.exports.refreshChangedServerTools = refreshChangedServerTools;
