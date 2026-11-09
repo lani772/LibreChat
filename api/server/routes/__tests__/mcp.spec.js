@@ -156,6 +156,10 @@ jest.mock('~/server/services/Config/mcp', () => ({
   updateMCPServerTools: jest.fn(),
 }));
 
+jest.mock('~/server/services/initializeMCPs', () => ({
+  getGoogleWorkspaceOAuthFlow: jest.fn(),
+}));
+
 const mockResolveAllMcpConfigs = jest.fn().mockResolvedValue({});
 const mockResolveMcpConfigNames = jest.fn().mockResolvedValue([]);
 jest.mock('~/server/services/MCP', () => ({
@@ -343,6 +347,79 @@ describe('MCP Routes', () => {
     cacheService.getMCPToolsCacheGeneration.mockReset().mockResolvedValue('test-generation');
     cacheService.cacheMCPServerTools.mockReset().mockResolvedValue(undefined);
     cacheService.invalidateCachedTools.mockReset().mockResolvedValue(undefined);
+  });
+
+  describe('Google Workspace connector OAuth routes', () => {
+    const { getGoogleWorkspaceOAuthFlow } = require('~/server/services/initializeMCPs');
+    const { getTenantId } = require('@librechat/data-schemas');
+
+    it('starts authorization using only the authenticated principal and tenant', async () => {
+      getTenantId.mockReturnValue('tenant-a');
+      const flow = {
+        begin: jest.fn().mockResolvedValue({
+          authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque',
+          expiresAt: new Date('2026-11-09T20:30:00.000Z'),
+        }),
+      };
+      getGoogleWorkspaceOAuthFlow.mockReturnValue(flow);
+
+      const response = await request(app)
+        .post('/api/mcp/connectors/google/507f1f77bcf86cd799439011/oauth/start')
+        .send({ tenantId: 'attacker-tenant', principalId: 'attacker-user' });
+
+      expect(response.status).toBe(201);
+      expect(flow.begin).toHaveBeenCalledWith({
+        identity: { tenantId: 'tenant-a', principalId: 'test-user-id' },
+        installationId: '507f1f77bcf86cd799439011',
+      });
+      expect(response.body.authorizationUrl).toContain('accounts.google.com');
+    });
+
+    it('rejects malformed installation identifiers before starting OAuth', async () => {
+      getTenantId.mockReturnValue('tenant-a');
+      const flow = { begin: jest.fn() };
+      getGoogleWorkspaceOAuthFlow.mockReturnValue(flow);
+
+      const response = await request(app)
+        .post('/api/mcp/connectors/google/not-an-object-id/oauth/start');
+
+      expect(response.status).toBe(400);
+      expect(flow.begin).not.toHaveBeenCalled();
+    });
+
+    it('completes the callback using the one-time state transaction', async () => {
+      const flow = {
+        complete: jest.fn().mockResolvedValue({
+          installationId: '507f1f77bcf86cd799439011',
+          connected: true,
+        }),
+      };
+      getGoogleWorkspaceOAuthFlow.mockReturnValue(flow);
+
+      const response = await request(app)
+        .get('/api/mcp/connectors/google/oauth/callback')
+        .query({ state: 'opaque-state', code: 'authorization-code' });
+
+      expect(response.status).toBe(200);
+      expect(flow.complete).toHaveBeenCalledWith({
+        state: 'opaque-state',
+        code: 'authorization-code',
+      });
+      expect(response.body.success).toBe(true);
+    });
+
+    it('consumes a provider cancellation without exposing provider error details', async () => {
+      const flow = { cancel: jest.fn().mockResolvedValue(true) };
+      getGoogleWorkspaceOAuthFlow.mockReturnValue(flow);
+
+      const response = await request(app)
+        .get('/api/mcp/connectors/google/oauth/callback')
+        .query({ state: 'opaque-state', error: 'access_denied', error_description: 'private detail' });
+
+      expect(response.status).toBe(200);
+      expect(flow.cancel).toHaveBeenCalledWith({ state: 'opaque-state' });
+      expect(response.text).not.toContain('private detail');
+    });
   });
 
   it.each([
