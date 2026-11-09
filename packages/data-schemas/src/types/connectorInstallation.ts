@@ -13,10 +13,10 @@ export type ConnectorInstallationState = (typeof CONNECTOR_INSTALLATION_STATES)[
 export type ConnectorInstallationVisibility = 'personal' | 'tenant';
 
 /**
- * Persistence record for an installed connector. Provider credentials are never
- * stored here: credentialRef is an opaque pointer intended for a protected
- * credential adapter. That adapter and its revocation integration are not yet
- * implemented; this field must never contain secret material. instanceKey is an internal opaque identifier, not an account
+ * Persistence record for an installed connector. Provider credentials are stored
+ * separately in ConnectorCredential and are never stored here. credentialRef is
+ * a legacy opaque pointer retained for compatibility; it must never contain
+ * secret material. instanceKey is an internal opaque identifier, not an account
  * name, email address, phone number, or provider-issued secret.
  */
 export interface ConnectorInstallationDocument {
