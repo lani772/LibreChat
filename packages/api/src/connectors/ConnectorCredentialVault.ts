@@ -2,6 +2,7 @@ import type {
   ConnectorCredentialCiphertext,
   ConnectorCredentialSummary,
 } from '@librechat/data-schemas';
+import { getTenantId } from '@librechat/data-schemas';
 import type { ConnectorService } from './ConnectorService';
 import {
   decryptConnectorCredential,
@@ -47,12 +48,12 @@ export class ConnectorCredentialVault {
     if (!json || Buffer.byteLength(json, 'utf8') > 64 * 1024) {
       throw new Error('Connector credential payload exceeds the 64 KiB limit');
     }
-    const authorized = await this.connectors.authorize(installationId);
-    if (authorized.installation.provider !== provider.toLowerCase()) {
-      throw new Error('Connector provider does not match its installation');
+    const tenantId = getTenantId();
+    if (!tenantId || tenantId === '__SYSTEM__') {
+      throw new Error('Connector credential storage requires an active tenant context');
     }
     const envelope = encryptConnectorCredential(json, {
-      tenantId: authorized.tenantId,
+      tenantId,
       installationId,
       provider,
     });
