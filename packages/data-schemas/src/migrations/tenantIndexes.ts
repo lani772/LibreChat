@@ -5,7 +5,7 @@ import skillSyncStatusSchema from '~/schema/skillSyncStatus';
 import agentCategorySchema from '~/schema/agentCategory';
 import { buildIndexWithRetry } from '~/utils/retry';
 import accessRoleSchema from '~/schema/accessRole';
-import mcpServerSchema from '~/schema/mcpServer';
+import mcpServerSchema from '~/schema/mcpServer';\nimport connectorInstallationSchema from '~/schema/connectorInstallation';
 import messageSchema from '~/schema/message';
 import presetSchema from '~/schema/preset';
 import agentSchema from '~/schema/agent';
@@ -26,7 +26,7 @@ const TENANT_SCHEMAS = {
   agentcategories: agentCategorySchema,
   accessroles: accessRoleSchema,
   conversationtags: conversationTagSchema,
-  mcpservers: mcpServerSchema,
+  mcpservers: mcpServerSchema,\n  connectorinstallations: connectorInstallationSchema,
   files: fileSchema,
   groups: groupSchema,
   skillsyncstatuses: skillSyncStatusSchema,
