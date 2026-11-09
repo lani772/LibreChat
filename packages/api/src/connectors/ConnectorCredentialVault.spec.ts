@@ -9,6 +9,8 @@ describe('ConnectorCredentialVault', () => {
     putConnectorCredential: jest.fn(),
     getConnectorCredentialCiphertext: jest.fn(),
     deleteConnectorCredential: jest.fn(),
+    claimConnectorCredentialRefresh: jest.fn(),
+    releaseConnectorCredentialRefresh: jest.fn(),
   };
   const execute = jest.fn();
   const connectorService = { execute } as unknown as ConnectorService;
