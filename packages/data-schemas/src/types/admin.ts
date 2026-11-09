@@ -1307,6 +1307,8 @@ export const AUDIT_ACTIONS = [
   'mcp_server.created',
   'mcp_server.updated',
   'mcp_server.deleted',
+  /** Connector-backed MCP tool invocation; outcomes distinguish allowed and denied attempts. */
+  'mcp.tool_invoked',
   'code_worker.paired',
   'code_worker.revoked',
   'langfuse.updated',
@@ -1352,6 +1354,7 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'mcp_server.created': 'mcp',
   'mcp_server.updated': 'mcp',
   'mcp_server.deleted': 'mcp',
+  'mcp.tool_invoked': 'mcp',
   'code_worker.paired': 'credential',
   'code_worker.revoked': 'credential',
   'langfuse.updated': 'config',
