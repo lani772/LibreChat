@@ -161,7 +161,6 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [ ] Implement KMS/HSM-backed key management and automated key rotation/re-encryption.
 - [ ] Implement provider OAuth refresh/revocation and concrete provider adapters.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
-- [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
 
 The connector credential persistence and vault service are now implemented on the feature branch. New credentials use AES-256-GCM and a dedicated `CONNECTOR_CREDENTIALS_KEY`; no plaintext is written to MongoDB. KMS/HSM integration, automated key rotation, provider token refresh/revocation, and provider-specific adapters remain outstanding. Tests are authored but have not been executed in this environment. The runtime guard and tenant-role permission resolver are committed on the feature branch. Test files have been authored but have not been executed in this environment. Tenant-shared connectors require `MCP_SERVERS.INVOKE_CONNECTORS`; general `MCP_SERVERS.USE` does not grant connector invocation. The resolver performs uncached tenant-partition role reads on every check. Personal-owner and explicit-grant checks still require the principal to be present in the active tenant partition.
 
