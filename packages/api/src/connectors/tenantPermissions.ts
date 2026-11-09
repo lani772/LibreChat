@@ -8,7 +8,7 @@ type ConnectorPrincipalRecord = {
 type ConnectorRoleRecord = {
   permissions?: {
     [PermissionTypes.MCP_SERVERS]?: {
-      [Permissions.USE]?: boolean;
+      [Permissions.INVOKE_CONNECTORS]?: boolean;
     };
   };
 };
@@ -25,10 +25,10 @@ export type TenantConnectorPermissionDependencies = {
 /**
  * Resolve tenant-shared connector access from LibreChat's existing tenant role.
  *
- * MCP-backed connectors use the existing MCP_SERVERS.USE role permission: it is
- * already exposed by the role editor and represents permission to consume MCP
- * servers. Reads are performed for every authorization check so role changes
- * take effect without waiting for a permission cache to expire.
+ * MCP-backed connectors use the dedicated MCP_SERVERS.INVOKE_CONNECTORS role
+ * permission. It is independent of general MCP server access and defaults to
+ * false for ordinary users. Reads are performed for every authorization check
+ * so role changes take effect without waiting for a permission cache to expire.
  */
 export function createTenantConnectorPermissionResolver({
   getUserById,
@@ -50,7 +50,7 @@ export function createTenantConnectorPermissionResolver({
 
     const role = await getPartitionRole(principal.role);
     const canInvokeTenantConnector =
-      role?.permissions?.[PermissionTypes.MCP_SERVERS]?.[Permissions.USE] === true;
+      role?.permissions?.[PermissionTypes.MCP_SERVERS]?.[Permissions.INVOKE_CONNECTORS] === true;
 
     return { isTenantMember: true, canInvokeTenantConnector };
   };
