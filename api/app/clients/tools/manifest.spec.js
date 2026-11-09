@@ -20,3 +20,13 @@ describe('isAgentsOnlyTool', () => {
     expect(isAgentsOnlyTool({ type: 'code_interpreter' })).toBe(false);
   });
 });
+
+describe('Google Drive manifest registration', () => {
+  it('exposes Google Drive as a first-party tool without user API credentials', () => {
+    expect(manifestToolMap.google_drive).toMatchObject({
+      name: 'Google Drive',
+      pluginKey: 'google_drive',
+      authConfig: [],
+    });
+  });
+});
