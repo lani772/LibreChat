@@ -15,6 +15,8 @@ jest.mock('@librechat/data-schemas', () => ({
 
 jest.mock('~/models', () => ({
   getConnectorInstallation: jest.fn(),
+  listConnectorInstallations: jest.fn(),
+  createConnectorInstallation: jest.fn(),
 }));
 
 jest.mock('~/server/middleware', () => ({
@@ -48,7 +50,56 @@ describe('Google Workspace connector routes', () => {
     getUserId.mockReturnValue('user-a');
   });
 
-  it('starts authorization using trusted tenant and principal context', async () => {
+
+  it('lists only the authenticated owner’s Google Workspace installations', async () => {
+    db.listConnectorInstallations.mockResolvedValue([{
+      _id: { toString: () => '507f1f77bcf86cd799439011' },
+      displayName: 'Work account',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+      version: 2,
+      credentialRef: 'must-not-leak',
+    }]);
+    const response = await request(app).get('/api/connectors/google-workspace');
+    expect(response.status).toBe(200);
+    expect(db.listConnectorInstallations).toHaveBeenCalledWith({
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      limit: 50,
+    });
+    expect(response.body.installations[0]).not.toHaveProperty('credentialRef');
+  });
+
+  it('creates a personal Google Workspace installation using trusted identity', async () => {
+    db.createConnectorInstallation.mockResolvedValue({
+      _id: { toString: () => '507f1f77bcf86cd799439011' },
+      displayName: 'Personal Drive',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'disconnected',
+      version: 0,
+    });
+    const response = await request(app)
+      .post('/api/connectors/google-workspace')
+      .send({ displayName: 'Personal Drive', ownerUserId: 'attacker' });
+    expect(response.status).toBe(201);
+    expect(db.createConnectorInstallation).toHaveBeenCalledWith({
+      provider: 'google-workspace',
+      displayName: 'Personal Drive',
+      visibility: 'personal',
+    });
+    expect(response.body).not.toHaveProperty('ownerUserId');
+  });
+
+  it('rejects blank or oversized Google Workspace display names', async () => {
+    const response = await request(app)
+      .post('/api/connectors/google-workspace')
+      .send({ displayName: '   ' });
+    expect(response.status).toBe(400);
+    expect(db.createConnectorInstallation).not.toHaveBeenCalled();
+  });
+\n  it('starts authorization using trusted tenant and principal context', async () => {
     const flow = {
       begin: jest.fn().mockResolvedValue({
         authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=opaque',
