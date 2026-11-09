@@ -37,7 +37,6 @@ export interface ConnectorInstallationDocument {
 }
 
 export interface CreateConnectorInstallationInput {
-  ownerUserId: string;
   provider: string;
   displayName: string;
   visibility: ConnectorInstallationVisibility;
