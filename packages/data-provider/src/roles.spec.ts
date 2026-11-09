@@ -159,6 +159,22 @@ describe('roleDefaults', () => {
     });
   });
 
+  describe('MCP_SERVERS.INVOKE_CONNECTORS defaults', () => {
+    it('grants ADMIN connector invocation by default', () => {
+      const adminMcp = roleDefaults[SystemRoles.ADMIN].permissions[
+        PermissionTypes.MCP_SERVERS
+      ] as Record<string, boolean>;
+      expect(adminMcp[Permissions.INVOKE_CONNECTORS]).toBe(true);
+    });
+
+    it('denies connector invocation to USER by default', () => {
+      const userMcp = roleDefaults[SystemRoles.USER].permissions[
+        PermissionTypes.MCP_SERVERS
+      ] as Record<string, boolean>;
+      expect(userMcp[Permissions.INVOKE_CONNECTORS]).toBe(false);
+    });
+  });
+
   describe('MCP_SERVERS.CONFIGURE_OBO defaults', () => {
     it('grants ADMIN CONFIGURE_OBO by default', () => {
       const adminMcp = roleDefaults[SystemRoles.ADMIN].permissions[
