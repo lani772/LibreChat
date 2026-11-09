@@ -12,6 +12,7 @@ import type { ClearFileCodeEnvRefsParams } from '~/types/file';
 import type { FileStorageMethods } from './fileStorage';
 import { createToolApprovalGrantMethods } from './toolApprovalGrant';
 import { createConnectorInstallationMethods, type ConnectorInstallationMethods } from './connectorInstallation';
+import { createConnectorCredentialMethods, type ConnectorCredentialMethods } from './connectorCredential';
 import { createScheduleMCPConsentStorage } from './scheduleConsent';
 export { createScheduleMCPConsentStorage } from './scheduleConsent';
 export type { ScheduleMCPConsentStorage, ScheduleConsentSnapshot } from './scheduleConsent';
@@ -277,6 +278,7 @@ export {
 export type AllMethods = SubagentContentMethods &
   ToolApprovalGrantStorage &
   ConnectorInstallationMethods &
+  ConnectorCredentialMethods &
   UserMethods &
   SessionMethods &
   TokenMethods &
@@ -523,6 +525,7 @@ export function createMethods(
     ...createUserMethods(mongoose, { getCache: deps.getCache }),
     ...createToolApprovalGrantMethods(mongoose),
     ...createConnectorInstallationMethods(mongoose),
+    ...createConnectorCredentialMethods(mongoose),
     ...createSessionMethods(mongoose),
     ...createTokenMethods(mongoose),
     ...createTokenListMethods(mongoose),
