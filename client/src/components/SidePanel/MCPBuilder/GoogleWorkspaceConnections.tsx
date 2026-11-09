@@ -134,7 +134,7 @@ export default function GoogleWorkspaceConnections() {
           <h3 id="google-workspace-title" className="text-sm font-semibold text-text-primary">Google Workspace</h3>
           <p className="text-xs text-text-secondary">Connect Drive for read-only file search and metadata.</p>
         </div>
-        <span className="text-xs text-text-secondary">{installations.length} connected setup(s)</span>
+        <span className="text-xs text-text-secondary">{installations.length} saved connection(s)</span>
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="google-workspace-name">Connection name</label>
