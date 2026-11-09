@@ -949,6 +949,30 @@ describe('MCPManager', () => {
       expect(checkout).not.toHaveBeenCalled();
     });
 
+    it('rechecks connector state immediately before dispatch after connection checkout', async () => {
+      const guard = jest
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('connector revoked'));
+      const manager = new MCPManager(undefined, undefined, undefined, guard);
+      const connection = createConnection();
+      jest.spyOn(manager, 'getConnection').mockResolvedValue(connection);
+
+      await expect(
+        manager.callTool({
+          user: mockUser,
+          serverName,
+          serverConfig: { ...serverConfig, dbId: '507f1f77bcf86cd799439011', source: 'user' },
+          toolName: 'test_tool',
+          provider: 'openai',
+          flowManager: mockFlowManager,
+        }),
+      ).rejects.toThrow('connector revoked');
+
+      expect(guard).toHaveBeenCalledTimes(2);
+      expect(connection.client.request).not.toHaveBeenCalled();
+    });
+
     it('checks connector authorization before returning a discovered tool catalog', async () => {
       const guard = jest.fn().mockRejectedValue(new Error('connector denied'));
       const manager = new MCPManager(undefined, undefined, undefined, guard);
