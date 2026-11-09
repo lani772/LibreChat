@@ -195,6 +195,8 @@ async function initializeMCPs() {
                 tenantId: pending.tenantId,
                 principalId: pending.principalId,
                 installationId: pending.installationId,
+                redirectUri: pending.redirectUri,
+                expiresAt: pending.expiresAt.getTime(),
               };
               await db.createGoogleOAuthState({
                 ...pending,
@@ -209,6 +211,8 @@ async function initializeMCPs() {
                 tenantId: pending.tenantId,
                 principalId: pending.principalId,
                 installationId: pending.installationId,
+                redirectUri: pending.redirectUri,
+                expiresAt: pending.expiresAt.getTime(),
               };
               const { encryptedCodeVerifier, ...safePending } = pending;
               return {
