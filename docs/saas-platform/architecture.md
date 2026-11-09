@@ -159,7 +159,7 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [x] Delete encrypted credential rows when an installation is revoked; include the collection in tenant index migration.
 - [x] Add tests for authenticated encryption, tamper detection, context binding, size limits, owner checks, tenant isolation, authorized reads, and revocation cleanup.
 - [ ] Implement KMS/HSM-backed key management and automated key rotation/re-encryption.
-- [ ] Implement provider OAuth refresh/revocation and concrete provider adapters.
+- [x] Implement Google Workspace refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect; concrete provider API adapters remain outstanding.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
 
 The connector credential persistence and vault service are now implemented on the feature branch. New credentials use AES-256-GCM and a dedicated `CONNECTOR_CREDENTIALS_KEY`; no plaintext is written to MongoDB. KMS/HSM integration, automated key rotation, provider token refresh/revocation, and provider-specific adapters remain outstanding. Tests are authored but have not been executed in this environment. The runtime guard and tenant-role permission resolver are committed on the feature branch. Test files have been authored but have not been executed in this environment. Tenant-shared connectors require `MCP_SERVERS.INVOKE_CONNECTORS`; general `MCP_SERVERS.USE` does not grant connector invocation. The resolver performs uncached tenant-partition role reads on every check. Personal-owner and explicit-grant checks still require the principal to be present in the active tenant partition.
@@ -189,7 +189,7 @@ GitHub Actions runs and commit status checks were not returned for the baseline 
 - [x] Build authorization URL/state/PKCE initiation and callback routes with tenant-bound, one-time state storage.
 - [x] Connect the authorization-code exchange to ConnectorCredentialVault so initial credentials are encrypted and persisted without exposing tokens; refresh-token rotation remains outstanding.
 - [ ] Define least-privilege Google Workspace scopes and implement the first read-only provider API tool.
-- [ ] Add scheduled/just-in-time refresh coordination, remote revocation orchestration, and disconnect/reconnect lifecycle handling.
+- [x] Add just-in-time refresh coordination, remote revocation orchestration, and local disconnect lifecycle handling.
 - [ ] Implement KMS/HSM-backed key management and versioned credential re-encryption before production onboarding.
 
 The token adapter and orchestration flow are wired to authenticated HTTP initiation and a public state-correlated callback. The first provider API tool, refresh scheduling, remote revocation, and KMS/HSM-backed key rotation remain outstanding. Tests are authored but have not been executed in a local dependency-enabled environment; no CI workflow run was available for this branch head.
@@ -205,7 +205,7 @@ The token adapter and orchestration flow are wired to authenticated HTTP initiat
 - [x] Add unit tests for state creation/hash-only storage, ownership denial, PKCE exchange, encrypted vault handoff, replay rejection, revoked installation, and malformed callback input.
 - [x] Implement the durable MongoDB state collection with a unique state-hash index, encrypted PKCE verifier bound to tenant/principal/installation/redirect/expiry metadata, TTL cleanup, and atomic find-and-delete consume.
 - [x] Wire authenticated same-origin POST initiation, a public state-correlated callback, and an owner-only safe status endpoint; apply rate limiting, fixed redirect URI, and state-consuming provider cancellation. Frontend connection UI/status presentation remains outstanding.
-- [ ] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
+- [x] Add refresh-token preservation/rotation, refresh coordination, disconnect and remote revocation orchestration.
 - [ ] Run Jest, package typecheck, lint, and integration tests in a dependency-enabled environment.
 
 The orchestration service is wired to the production MongoDB state store, startup-enforced unique/TTL indexes (including when automatic index creation is disabled), independent PKCE-verifier encryption key, and tenant AsyncLocalStorage context runner. The authenticated start route is `POST /api/connectors/google-workspace/:installationId/authorize`; the public callback is `GET /api/connectors/google-workspace/callback`; the owner-only safe status route is `GET /api/connectors/google-workspace/:installationId/status`. The configured `GOOGLE_WORKSPACE_REDIRECT_URI` must exactly match the callback URL. HTTP routes are mounted; the frontend connection UI is not yet implemented. Google OAuth remains disabled unless client credentials, a fixed HTTPS callback, explicit scopes, and both independent encryption keys are configured. Tests are authored but not executed.
