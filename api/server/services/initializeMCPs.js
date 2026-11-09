@@ -13,6 +13,7 @@ const {
   ConnectorService,
   createConnectorAuditWriter,
   createConnectorMCPAuthorizationGuard,
+  createTenantConnectorPermissionResolver,
   reportStoredMCPTombstones,
 } = require('@librechat/api');
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
@@ -131,17 +132,13 @@ async function initializeMCPs() {
       installations: {
         getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
       },
-      resolvePrincipalPermissions: async ({ tenantId, principalId }) => {
-        // getUserById runs through the existing tenant-isolated User model. A missing or
-        // differently partitioned principal is not a tenant member. Until a dedicated
-        // tenant-connector permission is defined in LibreChat's role schema, shared
-        // tenant connectors remain denied rather than inheriting broad tenant membership.
-        const principal = await db.getUserById(principalId, 'tenantId');
-        return {
-          isTenantMember: principal?.tenantId === tenantId,
-          canInvokeTenantConnector: false,
-        };
-      },
+      resolvePrincipalPermissions: createTenantConnectorPermissionResolver({
+        // Both reads execute under the request's trusted tenant AsyncLocalStorage context.
+        // getPartitionRole bypasses the shared role cache so permission revocation applies
+        // to the next discovery/execution authorization check.
+        getUserById: (principalId, fields) => db.getUserById(principalId, fields),
+        getPartitionRole: (roleName) => db.getPartitionRole(roleName),
+      }),
       audit: createConnectorAuditWriter((input, options) => db.recordAuditEntry(input, options)),
     });
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
