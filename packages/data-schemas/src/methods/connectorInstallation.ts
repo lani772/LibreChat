@@ -141,7 +141,10 @@ export function createConnectorInstallationMethods(
   ): Promise<Pick<ConnectorInstallationDocument, '_id'> | null> {
     if (!mongoose.isValidObjectId(mcpServerId)) return null;
     return runAsSystem(async () =>
-      Model.findOne({ mcpServerId }).select('_id').lean<Pick<ConnectorInstallationDocument, '_id'>>().exec(),
+      Model.findOne({ mcpServerId })
+        .select('_id')
+        .lean<Pick<ConnectorInstallationDocument, '_id'>>()
+        .exec(),
     );
   }
 
