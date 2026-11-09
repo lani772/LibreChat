@@ -141,6 +141,78 @@ describe('connector credential persistence', () => {
     });
   });
 
+  it('allows only one concurrent process to claim the refresh lease', async () => {
+    const installation = await createInstallation();
+    const installationId = String(installation._id);
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().putConnectorCredential({
+        installationId,
+        provider: 'chatwoot',
+        encryptedPayload: 'initial-ciphertext',
+        keyVersion: 'gcm1',
+      }),
+    );
+    const leaseUntil = new Date(Date.now() + 30_000);
+    const first = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().claimConnectorCredentialRefresh({
+        installationId,
+        leaseToken: 'process-one',
+        leaseUntil,
+      }),
+    );
+    const second = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().claimConnectorCredentialRefresh({
+        installationId,
+        leaseToken: 'process-two',
+        leaseUntil,
+      }),
+    );
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+  });
+
+  it('fences credential writes with the current refresh lease token', async () => {
+    const installation = await createInstallation();
+    const installationId = String(installation._id);
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().putConnectorCredential({
+        installationId,
+        provider: 'chatwoot',
+        encryptedPayload: 'initial-ciphertext',
+        keyVersion: 'gcm1',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().claimConnectorCredentialRefresh({
+        installationId,
+        leaseToken: 'current-lease',
+        leaseUntil: new Date(Date.now() + 30_000),
+      }),
+    );
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+        methods().putConnectorCredential({
+          installationId,
+          provider: 'chatwoot',
+          encryptedPayload: 'refreshed-ciphertext',
+          keyVersion: 'gcm1',
+          refreshLeaseToken: 'stale-lease',
+        }),
+      ),
+    ).rejects.toThrow('lease was lost');
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+        methods().putConnectorCredential({
+          installationId,
+          provider: 'chatwoot',
+          encryptedPayload: 'refreshed-ciphertext',
+          keyVersion: 'gcm1',
+          refreshLeaseToken: 'current-lease',
+        }),
+      ),
+    ).resolves.toMatchObject({ credentialPresent: true });
+  });
+
   it('deletes credentials only for their installation owner', async () => {
     const installation = await createInstallation();
     await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
