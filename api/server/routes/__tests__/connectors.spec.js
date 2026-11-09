@@ -72,6 +72,7 @@ describe('Google Workspace connector routes', () => {
   });
 
   it('creates a personal Google Workspace installation using trusted identity', async () => {
+    getGoogleWorkspaceOAuthFlow.mockReturnValue({ begin: jest.fn() });
     db.createConnectorInstallation.mockResolvedValue({
       _id: { toString: () => '507f1f77bcf86cd799439011' },
       displayName: 'Personal Drive',
@@ -90,6 +91,16 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
     });
     expect(response.body).not.toHaveProperty('ownerUserId');
+  });
+
+
+  it('does not create an orphan installation when Google OAuth is disabled', async () => {
+    getGoogleWorkspaceOAuthFlow.mockReturnValue(undefined);
+    const response = await request(app)
+      .post('/api/connectors/google-workspace')
+      .send({ displayName: 'Personal Drive' });
+    expect(response.status).toBe(503);
+    expect(db.createConnectorInstallation).not.toHaveBeenCalled();
   });
 
   it('rejects blank or oversized Google Workspace display names', async () => {
