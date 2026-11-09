@@ -11,9 +11,8 @@ describe('ConnectorCredentialVault', () => {
     getConnectorCredentialCiphertext: jest.fn(),
     deleteConnectorCredential: jest.fn(),
   };
-  const connectorService = {
-    execute: jest.fn(),
-  } as unknown as ConnectorService;
+  const execute = jest.fn();
+  const connectorService = { execute } as unknown as ConnectorService;
   let vault: ConnectorCredentialVault;
 
   beforeEach(() => {
@@ -55,7 +54,7 @@ describe('ConnectorCredentialVault', () => {
         keyVersion: 'gcm1',
       };
     });
-    connectorService.execute.mockImplementation(async (_id, callback) =>
+    execute.mockImplementation(async (_id, callback) =>
       callback({
         tenantId: 'tenant-a',
         principalId: 'user-a',
@@ -67,13 +66,13 @@ describe('ConnectorCredentialVault', () => {
       credentials.apiToken,
     );
     expect(result).toBe('secret-value');
-    expect(connectorService.execute).toHaveBeenCalledWith(installationId, expect.any(Function));
+    expect(execute).toHaveBeenCalledWith(installationId, expect.any(Function));
     expect(store.getConnectorCredentialCiphertext).toHaveBeenCalledWith(installationId);
   });
 
   it('does not read or decrypt credentials when connector authorization fails', async () => {
     const denial = new Error('denied');
-    connectorService.execute.mockRejectedValue(denial);
+    execute.mockRejectedValue(denial);
     await expect(
       vault.withCredentials(installationId, async () => 'should-not-run'),
     ).rejects.toBe(denial);
