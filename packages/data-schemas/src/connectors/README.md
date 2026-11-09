@@ -13,7 +13,7 @@ Connector installation metadata and provider credentials are stored separately. 
 
 ## Credential vault
 
-The `connectorcredentials` collection stores only an AES-256-GCM envelope, tenant ID, installation ID, provider, owner ID, and algorithm/key version metadata. The encrypted payload is excluded from normal Mongoose projections. Its unique index is tenant + installation scoped, and the collection participates in the tenant index migration.
+The `connectorcredentials` collection stores only an AES-256-GCM envelope, tenant ID, installation ID, provider, owner ID, and encryption-envelope format metadata. The encrypted payload is excluded from normal Mongoose projections. Its unique index is tenant + installation scoped, and the collection participates in the tenant index migration.
 
 Owner-only writes and deletes derive the principal from trusted request context and verify that the connector installation belongs to that owner and tenant. Credential reads are tenant-scoped. Application code should obtain plaintext only through `ConnectorCredentialVault.withCredentials()`, which invokes `ConnectorService.execute()` first so authorization and durable audit complete before ciphertext lookup/decryption.
 
