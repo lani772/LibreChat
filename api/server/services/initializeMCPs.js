@@ -146,7 +146,7 @@ async function initializeMCPs() {
     });
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
       findInstallationByMCPServerId: (mcpServerId) =>
-        db.getConnectorInstallationByMCPServerId(mcpServerId),
+        db.getConnectorInstallationBindingByMCPServerId(mcpServerId),
       authorizeInstallation: (installationId) => connectorService.authorize(installationId),
     });
 
