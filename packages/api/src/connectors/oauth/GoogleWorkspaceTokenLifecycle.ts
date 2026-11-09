@@ -3,7 +3,7 @@ import type { ConnectorCredentialVault, ConnectorCredentialValues } from '../Con
 import { GoogleWorkspaceOAuthError, type GoogleWorkspaceOAuthAdapter } from './GoogleWorkspaceOAuthAdapter';
 
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 2 * 60 * 1000;
-const REFRESH_LEASE_MS = 30_000;
+const REFRESH_LEASE_MS = 120_000;
 const REFRESH_WAIT_MS = 250;
 const REFRESH_ATTEMPTS = 60;
 
