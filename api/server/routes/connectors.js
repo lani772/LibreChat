@@ -14,7 +14,7 @@ function setNoStoreHeaders(res) {
 
 function clientResultUrl(result) {
   const base = process.env.DOMAIN_CLIENT || 'http://localhost:3080';
-  const url = new URL('/connectors', base);
+  const url = new URL('/', base);
   url.searchParams.set('googleWorkspace', result);
   return url.toString();
 }
