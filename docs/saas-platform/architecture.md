@@ -240,3 +240,17 @@ The token lifecycle service is wired during MCP initialization and exposed only 
 - [ ] Run Jest, package typecheck, lint, and full regression suites in a dependency-enabled checkout.
 
 The Google Drive adapter intentionally does not download or mutate files. `GOOGLE_WORKSPACE_SCOPES` must include `https://www.googleapis.com/auth/drive.metadata.readonly`; existing installations that did not grant this scope must reconnect to consent to it. No tests or typechecks have been executed in this environment.
+
+
+### Google Workspace connection UI and model-callable Drive tool — implementation progress
+
+- [x] Add owner-scoped create/list installation endpoints; derive tenant and owner from trusted request context.
+- [x] Add Google Workspace account manager to the existing MCP Servers panel with connect, reauthorize, state display, and disconnect actions.
+- [x] Register the built-in `google_drive` tool in the manifest, schema registry, and runtime tool loader used by agent and assistant tool execution.
+- [x] Support Drive metadata search and metadata retrieval only; account selection is owner-scoped and connector authorization is rechecked at every provider operation.
+- [x] Add tests for installation routes and tool account selection, routing, and error redaction.
+- [ ] Run the focused Jest suites, frontend tests, package typechecks, lint, and full regression suite in a dependency-enabled checkout.
+- [ ] Run a live Google OAuth + Drive read-only integration test using a dedicated authorized test account.
+- [ ] Add a durable remote-revocation retry/outbox for Google token revocation failures and KMS/HSM-backed key management before production onboarding.
+
+The connection UI and model-callable tool are committed to the feature branch. Tests remain authored but unexecuted; no live Google account test has been performed.
