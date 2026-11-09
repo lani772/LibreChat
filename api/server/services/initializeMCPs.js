@@ -168,13 +168,16 @@ async function initializeMCPs() {
       process.env.GOOGLE_WORKSPACE_CLIENT_ID &&
       process.env.GOOGLE_WORKSPACE_CLIENT_SECRET &&
       process.env.GOOGLE_WORKSPACE_REDIRECT_URI &&
-      googleScopes.length > 0
+      googleScopes.length > 0 &&
+      /^[a-f\\d]{64}$/i.test(process.env.CONNECTOR_OAUTH_STATE_KEY || '') &&
+      /^[a-f\\d]{64}$/i.test(process.env.CONNECTOR_CREDENTIALS_KEY || '')
     ) {
-      const adapter = new GoogleWorkspaceOAuthAdapter({
-        clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
-      });
-      googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
+      try {
+        const adapter = new GoogleWorkspaceOAuthAdapter({
+          clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
+        });
+        googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
         adapter,
         vault: connectorCredentialVault,
         installations: {
@@ -220,8 +223,12 @@ async function initializeMCPs() {
         },
         clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
         redirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI,
-        scopes: googleScopes,
-      });
+          scopes: googleScopes,
+        });
+      } catch {
+        googleWorkspaceOAuthFlow = undefined;
+        logger.warn('[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.');
+      }
     } else {
       googleWorkspaceOAuthFlow = undefined;
     }
