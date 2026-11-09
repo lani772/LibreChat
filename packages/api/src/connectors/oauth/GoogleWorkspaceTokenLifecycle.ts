@@ -86,7 +86,7 @@ export class GoogleWorkspaceTokenLifecycle {
           try {
             // Re-read inside a fresh authorized vault operation after acquiring the
             // distributed lease. The original snapshot may predate another process's refresh.
-            return this.deps.vault.withCredentials(installationId, async (latestCredentials) => {
+            return await this.deps.vault.withCredentials(installationId, async (latestCredentials) => {
               const latestAccess = requiredCredential(latestCredentials, 'accessToken');
               const latestExpiry = Number(latestCredentials.expiresAt);
               if (
