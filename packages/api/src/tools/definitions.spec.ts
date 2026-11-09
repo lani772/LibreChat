@@ -33,6 +33,17 @@ describe('definitions.ts', () => {
     expect(definition.description.length).toBeLessThanOrEqual(MAX_PROVIDER_TOOL_DESCRIPTION_LENGTH);
   });
 
+
+  it('registers the Google Drive tool as a read-only built-in', () => {
+    const definition = getToolDefinition('google_drive');
+    expect(definition).toBeDefined();
+    expect(definition?.toolType).toBe('builtin');
+    expect(definition?.schema.properties?.action).toMatchObject({
+      enum: ['search_files', 'get_file_metadata'],
+    });
+    expect(definition?.schema.required).toContain('action');
+  });
+
   describe('loadToolDefinitions', () => {
     it.each([undefined, false, true])(
       'gates selected comparison definitions on explicit opt-in (%p)',
