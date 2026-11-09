@@ -74,6 +74,23 @@ describe('ConnectorService', () => {
     );
   });
 
+  it('does not expose a credential reference to the provider callback', async () => {
+    const test = setup({ record: installation({ credentialRef: 'vault-secret-pointer' }) });
+    const result = await test.run(() => test.service.authorize('installation-id'));
+    expect(result.installation).not.toHaveProperty('credentialRef');
+  });
+
+  it('fails closed when the permission resolver returns incomplete data', async () => {
+    const service = new ConnectorService({
+      installations: { getConnectorInstallation: jest.fn().mockResolvedValue(installation()) },
+      resolvePrincipalPermissions: jest.fn().mockResolvedValue({ isTenantMember: true }),
+      audit: jest.fn().mockResolvedValue(undefined),
+    });
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      service.authorize('installation-id'),
+    )).rejects.toBeInstanceOf(ConnectorAccessError);
+  });
+
   it('allows an explicitly granted principal', async () => {
     const test = setup({
       principalId: 'user-b',
