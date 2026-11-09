@@ -65,6 +65,11 @@ describe('connector credential persistence', () => {
       provider: 'chatwoot',
       credentialPresent: true,
     });
+    const ordinaryRead = await mongoose.models.ConnectorCredential.findOne({
+      installationId: String(installation._id),
+    }).lean();
+    expect(ordinaryRead?.encryptedPayload).toBeUndefined();
+
     const raw = await mongoose.models.ConnectorCredential.findOne({
       installationId: String(installation._id),
     }).select('+encryptedPayload').lean();
