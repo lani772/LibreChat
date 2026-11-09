@@ -106,6 +106,18 @@ describe('GoogleWorkspaceOAuthFlow', () => {
     expect(adapter.exchangeAuthorizationCode).not.toHaveBeenCalled();
   });
 
+  it('consumes provider-cancelled state and marks the installation as an OAuth error', async () => {
+    const { flow, installations, states } = setup();
+    const started = await flow.begin({ identity, installationId: '507f1f77bcf86cd799439011' });
+    const state = new URL(started.authorizationUrl).searchParams.get('state')!;
+    expect(await flow.cancel({ state })).toBe(true);
+    expect(states.consume).toHaveBeenCalledTimes(1);
+    expect(installations.transitionConnectorInstallation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: 'error', lastErrorCode: 'oauth_user_cancelled' }),
+    );
+    expect(await flow.cancel({ state })).toBe(false);
+  });
+
   it('rejects invalid callback inputs before consuming state', async () => {
     const { flow, states } = setup();
     await expect(flow.complete({ state: 'bad', code: 'code' })).rejects.toThrow('Invalid Google OAuth callback');
