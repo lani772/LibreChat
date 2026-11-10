@@ -48,3 +48,4 @@ export { default as scheduleRunSchema } from './scheduleRun';
 export { default as connectorInstallationSchema } from './connectorInstallation';
 export { default as connectorCredentialSchema } from './connectorCredential';
 export { default as googleOAuthStateSchema } from './googleOAuthState';
+export { default as connectorRevocationSchema } from './connectorRevocation';
