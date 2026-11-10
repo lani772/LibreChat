@@ -14,6 +14,17 @@ interface InstallationsResponse {
   installations: GoogleWorkspaceInstallation[];
 }
 
+interface TenantMember {
+  id: string;
+  name: string | null;
+  username: string | null;
+  email: string;
+}
+
+interface TenantMembersResponse {
+  members: TenantMember[];
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(response.status === 403
@@ -30,7 +41,10 @@ export default function GoogleWorkspaceConnections() {
   const [displayName, setDisplayName] = useState('Google Workspace');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [grantDrafts, setGrantDrafts] = useState<Record<string, string>>({});
+  const [grantDrafts, setGrantDrafts] = useState<Record<string, string[]>>({});
+  const [memberQueries, setMemberQueries] = useState<Record<string, string>>({});
+  const [memberResults, setMemberResults] = useState<Record<string, TenantMember[]>>({});
+  const [memberSearchBusyId, setMemberSearchBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,14 +125,39 @@ export default function GoogleWorkspaceConnections() {
     }
   };
 
+  const searchMembers = async (installation: GoogleWorkspaceInstallation) => {
+    const query = (memberQueries[installation.id] ?? '').trim();
+    if (query.length < 2 || query.length > 64) {
+      setError('Enter at least 2 characters to search tenant members.');
+      return;
+    }
+    setMemberSearchBusyId(installation.id);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/connectors/google-workspace/${encodeURIComponent(installation.id)}/members?q=${encodeURIComponent(query)}`,
+        { credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store' },
+      );
+      const data = await readJson<TenantMembersResponse>(response);
+      setMemberResults((current) => ({ ...current, [installation.id]: data.members }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to search tenant members.');
+    } finally {
+      setMemberSearchBusyId(null);
+    }
+  };
+
+  const toggleGrant = (installation: GoogleWorkspaceInstallation, memberId: string, checked: boolean) => {
+    const current = grantDrafts[installation.id] ?? installation.grantedPrincipalIds ?? [];
+    const next = checked ? [...new Set([...current, memberId])] : current.filter((id) => id !== memberId);
+    setGrantDrafts((drafts) => ({ ...drafts, [installation.id]: next }));
+  };
+
   const saveGrants = async (installation: GoogleWorkspaceInstallation) => {
     setBusyId(installation.id);
     setError(null);
     setMessage(null);
-    const principalIds = (grantDrafts[installation.id] ?? (installation.grantedPrincipalIds ?? []).join(','))
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean);
+    const principalIds = grantDrafts[installation.id] ?? installation.grantedPrincipalIds ?? [];
     try {
       const response = await fetch(
         `/api/connectors/google-workspace/${encodeURIComponent(installation.id)}/grants`,
@@ -227,27 +266,51 @@ export default function GoogleWorkspaceConnections() {
               ) : null}
             </div>
             {installation.state !== 'revoked' ? (
-              <div className="mt-2 w-full">
-                <label className="mb-1 block text-xs text-text-secondary" htmlFor={`connector-grants-${installation.id}`}>
-                  Share with tenant members (user IDs, comma-separated)
+              <div className="mt-2 w-full rounded-md border border-border-medium p-2">
+                <label className="mb-1 block text-xs font-medium text-text-secondary" htmlFor={`connector-member-search-${installation.id}`}>
+                  Find tenant members by name, username, or email
                 </label>
                 <div className="flex gap-2">
                   <input
-                    id={`connector-grants-${installation.id}`}
+                    id={`connector-member-search-${installation.id}`}
                     className="min-w-0 flex-1 rounded-md border border-border-medium bg-surface-primary px-2 py-1 text-xs text-text-primary"
-                    value={grantDrafts[installation.id] ?? (installation.grantedPrincipalIds ?? []).join(', ')}
-                    onChange={(event) => setGrantDrafts((current) => ({
-                      ...current,
-                      [installation.id]: event.target.value,
-                    }))}
-                    aria-label={`Tenant member user IDs for ${installation.displayName}`}
+                    value={memberQueries[installation.id] ?? ''}
+                    onChange={(event) => setMemberQueries((current) => ({ ...current, [installation.id]: event.target.value }))}
+                    placeholder="Search members…"
+                    maxLength={64}
                   />
                   <button
                     type="button"
                     className="text-xs font-medium text-text-primary underline disabled:opacity-50"
-                    disabled={busyId === installation.id}
-                    onClick={() => void saveGrants(installation)}
+                    disabled={memberSearchBusyId === installation.id}
+                    onClick={() => void searchMembers(installation)}
                   >
+                    {memberSearchBusyId === installation.id ? 'Searching…' : 'Find'}
+                  </button>
+                </div>
+                {(memberResults[installation.id] ?? []).length > 0 ? (
+                  <ul className="mt-2 space-y-1">
+                    {(memberResults[installation.id] ?? []).map((member) => {
+                      const selected = (grantDrafts[installation.id] ?? installation.grantedPrincipalIds ?? []).includes(member.id);
+                      return (
+                        <li key={member.id}>
+                          <label className="flex cursor-pointer items-center gap-2 text-xs text-text-primary">
+                            <input type="checkbox" checked={selected} onChange={(event) => toggleGrant(installation, member.id, event.target.checked)} />
+                            <span className="min-w-0">
+                              <span className="block truncate">{member.name || member.username || member.email}</span>
+                              <span className="block truncate text-text-secondary">{member.email}</span>
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : memberResults[installation.id] ? (
+                  <p className="mt-2 text-xs text-text-secondary">No matching tenant members found.</p>
+                ) : null}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-text-secondary">{(grantDrafts[installation.id] ?? installation.grantedPrincipalIds ?? []).length} people selected</span>
+                  <button type="button" className="text-xs font-medium text-text-primary underline disabled:opacity-50" disabled={busyId === installation.id} onClick={() => void saveGrants(installation)}>
                     Save sharing
                   </button>
                 </div>
