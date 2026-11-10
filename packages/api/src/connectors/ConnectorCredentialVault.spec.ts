@@ -61,9 +61,15 @@ describe('ConnectorCredentialVault', () => {
       }),
     );
 
-    const result = await vault.withCredentials(installationId, async (credentials) =>
-      credentials.apiToken,
-    );
+    const result = await vault.withCredentials(installationId, async (credentials, snapshot) => {
+      expect(snapshot).toMatchObject({
+        tenantId: 'tenant-a',
+        installationId,
+        provider: 'chatwoot',
+      });
+      expect(snapshot.encryptedPayload).toContain('ciphertext');
+      return credentials.apiToken;
+    });
     expect(result).toBe('secret-value');
     expect(execute).toHaveBeenCalledWith(installationId, expect.any(Function));
     expect(store.getConnectorCredentialCiphertext).toHaveBeenCalledWith(installationId);
