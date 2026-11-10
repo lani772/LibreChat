@@ -51,6 +51,14 @@ The command defaults to dry-run; `--apply` is required to write. It accepts batc
 
 This is an application-level rotation workflow, not KMS/HSM custody. Production key storage, access controls, key backup, approval, and emergency recovery remain responsibilities of the deployment secret manager and operator process.
 
+## Durable remote revocation
+
+Google Workspace disconnect first copies the existing encrypted credential envelope into the tenant-isolated `connectorrevocations` outbox, then revokes the local installation and deletes the ordinary credential row. The copied value remains AES-256-GCM ciphertext and is bound to the same tenant, installation, and provider AAD; plaintext tokens are never written to the outbox.
+
+A background worker claims jobs with an atomic lease, verifies the installation is locally revoked, decrypts the payload only in the worker, and calls Google's fixed revocation endpoint. Successful jobs clear the encrypted payload. Failures use bounded exponential backoff (30 seconds up to six hours) and move to a `dead` state after the configured attempt limit. MongoDB leases coordinate multiple API replicas. The worker emits aggregate counts and safe error codes only.
+
+The worker starts only when Google Workspace OAuth is configured and its collection indexes have been created. The disconnect API reports `pending` while a durable job is queued or awaiting retry, `confirmed` only for the immediate fallback path when enqueueing fails but Google's revoke call succeeds, and `not_attempted` when no token was available or neither path could be completed. If the outbox is unavailable, the service makes one immediate best-effort revoke attempt before local credential cleanup; a failed fallback cannot be retried durably and must be treated as an operational alert. Dead jobs retain ciphertext for operator investigation and must be handled under the same key-access controls as credential records.
+
 ## Provider OAuth adapter foundation
 
 `oauth/types.ts` defines a provider-neutral token lifecycle contract. `GoogleWorkspaceOAuthAdapter` uses Google's fixed token and revocation endpoints and supports authorization-code exchange (including optional PKCE verifier), refresh-token exchange, and token revocation. It requires a refresh token on initial authorization so the connection can operate offline; refresh responses that omit a rotated refresh token leave preservation of the existing token to the caller. Provider response bodies are not propagated into errors, requests have bounded timeouts, and client credentials are supplied by server configuration rather than returned to the model. The adapter is exported from the `@librechat/api` connector module.
