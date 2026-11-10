@@ -57,6 +57,14 @@ Google Workspace disconnect first copies the existing encrypted credential envel
 
 A background worker claims jobs with an atomic lease, verifies the installation is locally revoked, decrypts the payload only in the worker, and calls Google's fixed revocation endpoint. Successful jobs clear the encrypted payload. Failures use bounded exponential backoff (30 seconds up to six hours) and move to a `dead` state after the configured attempt limit. MongoDB leases coordinate multiple API replicas. The worker emits aggregate counts and safe error codes only.
 
+Dead-letter operations are intentionally kept out of the user-facing HTTP API. Operators can inspect safe metadata and explicitly requeue a job from a controlled deployment environment:
+
+- `npm --prefix api run manage-google-revocations -- list --limit=50`
+- `npm --prefix api run manage-google-revocations -- list --limit=50 --after=<object-id>`
+- `npm --prefix api run manage-google-revocations -- retry --id=<dead-letter-id>`
+
+The command requires database access and explicit system context. Listing never returns ciphertext or token values. Requeue resets the attempt counter only when the job still has ciphertext and its installation is locally revoked; the worker then performs the remote revoke again. Requeue is an operator action, not automatic, and should follow investigation of the safe error code and provider configuration.
+
 The worker starts only when Google Workspace OAuth is configured and its collection indexes have been created. The disconnect API reports `pending` while a durable job is queued or awaiting retry, `confirmed` only for the immediate fallback path when enqueueing fails but Google's revoke call succeeds, `not_attempted` when no token was available, and `retry_unavailable` when durable enqueue and the immediate fallback both fail. If the outbox is unavailable, the service makes one immediate best-effort revoke attempt before local credential cleanup; a failed fallback cannot be retried durably and must be treated as an operational alert. Dead jobs retain ciphertext for operator investigation and must be handled under the same key-access controls as credential records.
 
 ## Provider OAuth adapter foundation
