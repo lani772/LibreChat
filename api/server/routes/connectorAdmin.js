@@ -4,7 +4,6 @@ const db = require('~/models');
 const { requireJwtAuth, loginLimiter } = require('~/server/middleware');
 
 const router = Router();
-const OBJECT_ID_RE = /^[a-f\\d]{24}$/i;
 const MAX_PAGE_SIZE = 100;
 
 function setNoStoreHeaders(res) {
@@ -38,7 +37,6 @@ async function requireTenantAdmin(req, res, next) {
 /** Safe tenant-wide inventory; credential references and all secret fields are omitted. */
 router.get('/installations', loginLimiter, requireJwtAuth, requireTenantAdmin, async (req, res) => {
   setNoStoreHeaders(res);
-  const tenantId = getTenantId();
   try {
     const installations = await db.listConnectorInstallations({ limit: MAX_PAGE_SIZE });
     return res.status(200).json({
