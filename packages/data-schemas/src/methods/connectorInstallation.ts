@@ -306,7 +306,8 @@ export function createConnectorInstallationMethods(
       .select('state healthVersion consecutiveHealthFailures')
       .lean<{ state: ConnectorInstallationState; healthVersion: number; consecutiveHealthFailures?: number }>()
       .exec();
-    if (!current || current.healthVersion !== params.expectedHealthVersion ||
+    const currentHealthVersion = current?.healthVersion ?? 0;
+    if (!current || currentHealthVersion !== params.expectedHealthVersion ||
         (current.state !== 'connected' && current.state !== 'degraded')) {
       return null;
     }
@@ -325,8 +326,11 @@ export function createConnectorInstallationMethods(
       lastErrorCode: params.outcome === 'healthy' ? null : params.errorCode,
       ...(params.outcome === 'healthy' ? { lastSuccessfulHealthCheckAt: checkedAt } : {}),
     };
+    const healthVersionFilter = params.expectedHealthVersion === 0
+      ? { $or: [{ healthVersion: 0 }, { healthVersion: { $exists: false } }] }
+      : { healthVersion: params.expectedHealthVersion };
     return Model.findOneAndUpdate(
-      { _id: params.installationId, healthVersion: params.expectedHealthVersion, state: current.state },
+      { _id: params.installationId, state: current.state, ...healthVersionFilter },
       { $set: set, $inc: { healthVersion: 1 } },
       { new: true, runValidators: true },
     )
