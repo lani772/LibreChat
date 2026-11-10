@@ -13,11 +13,17 @@ describe('connector credential authenticated encryption', () => {
 
   beforeEach(() => {
     process.env.CONNECTOR_CREDENTIALS_KEY = '11'.repeat(32);
+    delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
+    delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
   });
 
   afterAll(() => {
     if (originalKey === undefined) delete process.env.CONNECTOR_CREDENTIALS_KEY;
     else process.env.CONNECTOR_CREDENTIALS_KEY = originalKey;
+    if (originalKeyring === undefined) delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
+    else process.env.CONNECTOR_CREDENTIALS_KEYRING = originalKeyring;
+    if (originalActiveKeyId === undefined) delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
+    else process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = originalActiveKeyId;
   });
 
   it('round-trips a credential object and never stores plaintext in the envelope', () => {
