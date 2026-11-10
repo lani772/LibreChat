@@ -38,7 +38,7 @@ export interface ConnectorInstallationMethods {
     mcpServerId: string;
     expectedVersion: number;
   }): Promise<ConnectorInstallationDocument | null>;
-  listConnectorHealthCandidates(options: { limit: number }): Promise<ConnectorInstallationDocument[]>;
+  listConnectorHealthCandidates(options: { limit: number; providers?: string[] }): Promise<ConnectorInstallationDocument[]>;
   listConnectorInstallations(options?: {
     ownerUserId?: string;
     provider?: string;
@@ -218,12 +218,19 @@ export function createConnectorInstallationMethods(
   }
 
   /** Oldest health observations first so repeated bounded batches make progress. */
-  async function listConnectorHealthCandidates(options: { limit: number }): Promise<ConnectorInstallationDocument[]> {
+  async function listConnectorHealthCandidates(options: { limit: number; providers?: string[] }): Promise<ConnectorInstallationDocument[]> {
     requireConnectorTenant('health candidate list');
     if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 25) {
       throw new Error('Connector health batch size must be between 1 and 25');
     }
-    return Model.find({ state: { $in: ['connected', 'degraded'] } })
+    const providers = options.providers?.map((provider) => provider.trim().toLowerCase()).filter(Boolean);
+    if (options.providers && (!providers?.length || providers.length > 20)) {
+      throw new Error('Connector health provider filter is invalid');
+    }
+    return Model.find({
+      state: { $in: ['connected', 'degraded'] },
+      ...(providers ? { provider: { $in: providers } } : {}),
+    })
       .select('-credentialRef')
       .sort({ lastHealthCheckAt: 1, _id: 1 })
       .limit(options.limit)
