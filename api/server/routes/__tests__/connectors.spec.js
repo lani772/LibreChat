@@ -6,6 +6,7 @@ const {
   getGoogleWorkspaceOAuthFlow,
   getGoogleWorkspaceTokenLifecycle,
   getGoogleDriveReadOnlyConnector,
+  getConnectorHealthMonitor,
 } = require('~/server/services/initializeMCPs');
 
 jest.mock('@librechat/data-schemas', () => ({
@@ -32,6 +33,7 @@ jest.mock('~/server/services/initializeMCPs', () => ({
   getGoogleWorkspaceOAuthFlow: jest.fn(),
   getGoogleWorkspaceTokenLifecycle: jest.fn(),
   getGoogleDriveReadOnlyConnector: jest.fn(),
+  getConnectorHealthMonitor: jest.fn(),
 }));
 
 describe('Google Workspace connector routes', () => {
@@ -508,4 +510,34 @@ describe('Google Workspace connector routes', () => {
     expect(response.headers.location).not.toContain('sensitive');
     expect(flow.cancel).toHaveBeenCalledWith({ state: 'opaque-state' });
   });
+
+  it('runs an owner-authorized health probe and returns only safe health metadata', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    getConnectorHealthMonitor.mockReturnValue({
+      checkInstallation: jest.fn().mockResolvedValue({
+        installationId: '507f1f77bcf86cd799439011',
+        status: 'healthy',
+        state: 'connected',
+        consecutiveFailures: 0,
+        errorCode: null,
+      }),
+    });
+    const response = await request(app)
+      .post('/api/connectors/google-workspace/507f1f77bcf86cd799439011/health-check');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      installationId: '507f1f77bcf86cd799439011',
+      healthy: true,
+      state: 'connected',
+      consecutiveFailures: 0,
+      errorCode: null,
+    });
+  });
+
+
 });
