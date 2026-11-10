@@ -264,7 +264,7 @@ export function createConnectorInstallationMethods(
    */
   async function recordConnectorHealth(params: {
     installationId: string;
-    expectedVersion: number;
+    expectedHealthVersion: number;
     outcome: 'healthy' | 'unhealthy';
     errorCode?: string;
     failureThreshold?: number;
