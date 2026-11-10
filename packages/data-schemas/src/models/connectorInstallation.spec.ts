@@ -392,6 +392,13 @@ describe('connector installation persistence', () => {
     );
     expect(second).toMatchObject({ state: 'degraded', consecutiveHealthFailures: 2, healthVersion: 2, version: 2 });
     expect(second?.lastErrorCode).toBe('google_provider_unavailable');
+
+    const reauthorization = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().transitionConnectorInstallation({
+        installationId: String(created._id), expectedVersion: 2, state: 'authorizing',
+      }),
+    );
+    expect(reauthorization).toMatchObject({ state: 'authorizing', version: 3 });
   });
 
   it('recovers a degraded installation after a successful health observation', async () => {
