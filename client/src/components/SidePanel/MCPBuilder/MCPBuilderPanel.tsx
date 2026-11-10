@@ -19,6 +19,7 @@ import MCPAdminSettings from './MCPAdminSettings';
 import MCPServerDialog from './MCPServerDialog';
 import MCPServerList from './MCPServerList';
 import GoogleWorkspaceConnections from './GoogleWorkspaceConnections';
+import ConnectorGovernance from './ConnectorGovernance';
 import store from '~/store';
 
 export default function MCPBuilderPanel() {
@@ -117,6 +118,7 @@ export default function MCPBuilderPanel() {
         className="px-3 pb-3"
       >
         <GoogleWorkspaceConnections />
+        {user?.role === SystemRoles.ADMIN && <ConnectorGovernance />}
         <MCPServerList
           servers={filteredServers}
           getServerStatusIconProps={getServerStatusIconProps}
