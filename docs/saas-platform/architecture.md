@@ -271,3 +271,8 @@ The connection UI and model-callable tool are committed to the feature branch. T
 - [ ] Execute focused Jest, typecheck, lint, and full regression suites in a dependency-enabled checkout.
 
 The keyring code and tests are committed, but test execution has not been possible in this workflow. Multi-key support is not a substitute for KMS/HSM key custody or a completed re-encryption migration.
+
+
+## Tenant connector governance
+
+A read-only tenant administrator API is mounted at `/api/admin/connectors`. It exposes tenant-scoped connector inventory and connector invocation audit history. Access is restricted to a principal whose current tenant-isolated user record has the built-in `ADMIN` role; the tenant/principal identity is taken from trusted request context. Inventory and audit responses are allowlisted and omit credential references, ciphertext, individual personal-grant identities, OAuth state, request context, and arbitrary audit metadata. The API does not grant administrators implicit authority to modify a personal connector's grants or ownership.
