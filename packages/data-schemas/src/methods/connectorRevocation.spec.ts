@@ -203,6 +203,13 @@ describe('Google Workspace revocation outbox persistence', () => {
     });
     expect(dead[0]).not.toHaveProperty('encryptedPayload');
 
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, async () => {
+      await mongoose.models.ConnectorInstallation.updateOne(
+        { _id: installation._id },
+        { $set: { state: 'revoked' } },
+      );
+    });
+
     await expect(
       tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
         methods().requeueGoogleWorkspaceRevocationDeadLetter({ id: job.id }),
