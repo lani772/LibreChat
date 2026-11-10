@@ -82,7 +82,7 @@ function validateInstallationId(value: string): void {
 }
 
 export interface GoogleDriveReadOnlyDependencies {
-  connectors: Pick<ConnectorService, 'execute' | 'executeHealthCheck'>;
+  connectors: Pick<ConnectorService, 'execute'>;
   tokenLifecycle: Pick<GoogleWorkspaceTokenLifecycle, 'getAccessToken'>;
   vault: Pick<ConnectorCredentialVault, 'withCredentials'>;
   fetcher?: typeof fetch;
@@ -99,28 +99,9 @@ export class GoogleDriveReadOnlyConnector {
     this.fetcher = deps.fetcher ?? fetch;
   }
 
-  /** Minimal read-only probe; degraded state is allowed only through the health-check guard. */
+  /** Minimal read-only probe used by the connector health monitor. */
   async checkHealth(installationId: string): Promise<void> {
-    validateInstallationId(installationId);
-    await this.deps.connectors.executeHealthCheck(installationId, async () => {
-      await this.assertReadOnlyScope(installationId);
-      const accessToken = await this.deps.tokenLifecycle.getAccessToken(installationId);
-      const url = new URL(`${DRIVE_API}/files`);
-      url.searchParams.set('pageSize', '1');
-      url.searchParams.set('fields', FILE_FIELDS);
-      url.searchParams.set('q', 'trashed = false');
-      url.searchParams.set('orderBy', 'modifiedTime desc');
-      await this.request<GoogleDriveListResult>(url, accessToken, (body) => {
-        if (!Array.isArray(body.files)) {
-          throw new GoogleDriveReadOnlyError('Google Drive returned an invalid file list', 'INVALID_RESPONSE', 502);
-        }
-        return {
-          files: body.files.map(safeFile),
-          ...(typeof body.nextPageToken === 'string' ? { nextPageToken: body.nextPageToken } : {}),
-          incompleteSearch: body.incompleteSearch === true,
-        };
-      });
-    });
+    await this.listFiles({ installationId, pageSize: 1 });
   }
 
   async listFiles(input: {
