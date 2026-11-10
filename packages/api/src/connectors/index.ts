@@ -12,3 +12,4 @@ export * from './oauth/GoogleWorkspaceTokenLifecycle';
 export * from './oauth/GoogleDriveReadOnlyConnector';
 export * from './ConnectorCredentialRotation';
 export * from './credentialRotationCli';
+export * from './oauth/GoogleWorkspaceRevocationWorker';
