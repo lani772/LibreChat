@@ -54,6 +54,9 @@ router.get('/google-workspace', loginLimiter, requireJwtAuth, async (req, res) =
         visibility: installation.visibility,
         state: installation.state,
         lastConnectedAt: installation.lastConnectedAt || null,
+        lastHealthCheckAt: installation.lastHealthCheckAt || null,
+        lastSuccessfulHealthCheckAt: installation.lastSuccessfulHealthCheckAt || null,
+        consecutiveHealthFailures: installation.consecutiveHealthFailures || 0,
         lastErrorCode: installation.lastErrorCode || null,
         grantedPrincipalIds: installation.grantedPrincipalIds || [],
         version: installation.version,
@@ -267,6 +270,9 @@ router.get(
         visibility: installation.visibility,
         state: installation.state,
         lastConnectedAt: installation.lastConnectedAt || null,
+        lastHealthCheckAt: installation.lastHealthCheckAt || null,
+        lastSuccessfulHealthCheckAt: installation.lastSuccessfulHealthCheckAt || null,
+        consecutiveHealthFailures: installation.consecutiveHealthFailures || 0,
         lastErrorCode: installation.lastErrorCode || null,
       });
     } catch {
