@@ -144,31 +144,31 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
       state: 'connected',
     });
-    db.findUsers.mockResolvedValue([{ _id: { toString: () => 'user-b' } }]);
+    db.findUsers.mockResolvedValue([{ _id: { toString: () => '507f191e810c19729de860ea' } }]);
     db.updateConnectorInstallationGrants.mockResolvedValue({
       _id: { toString: () => '507f1f77bcf86cd799439011' },
-      grantedPrincipalIds: ['user-b'],
+      grantedPrincipalIds: ['507f191e810c19729de860ea'],
       version: 3,
     });
 
     const response = await request(app)
       .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
-      .send({ expectedVersion: 2, principalIds: ['user-b', 'user-b'] });
+      .send({ expectedVersion: 2, principalIds: ['507f191e810c19729de860ea', '507f191e810c19729de860ea'] });
 
     expect(response.status).toBe(200);
     expect(db.findUsers).toHaveBeenCalledWith(
-      { _id: { $in: ['user-b'] } },
+      { _id: { $in: ['507f191e810c19729de860ea'] } },
       '_id',
       { limit: 100 },
     );
     expect(db.updateConnectorInstallationGrants).toHaveBeenCalledWith({
       installationId: '507f1f77bcf86cd799439011',
       expectedVersion: 2,
-      principalIds: ['user-b'],
+      principalIds: ['507f191e810c19729de860ea'],
     });
     expect(response.body).toEqual({
       installationId: '507f1f77bcf86cd799439011',
-      grantedPrincipalIds: ['user-b'],
+      grantedPrincipalIds: ['507f191e810c19729de860ea'],
       version: 3,
     });
   });
@@ -185,7 +185,7 @@ describe('Google Workspace connector routes', () => {
 
     const response = await request(app)
       .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
-      .send({ expectedVersion: 0, principalIds: ['user-from-another-tenant'] });
+      .send({ expectedVersion: 0, principalIds: ['507f191e810c19729de860eb'] });
 
     expect(response.status).toBe(400);
     expect(db.updateConnectorInstallationGrants).not.toHaveBeenCalled();
@@ -202,7 +202,7 @@ describe('Google Workspace connector routes', () => {
 
     const response = await request(app)
       .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
-      .send({ expectedVersion: 0, principalIds: ['user-c'] });
+      .send({ expectedVersion: 0, principalIds: ['507f191e810c19729de860ec'] });
 
     expect(response.status).toBe(404);
     expect(db.findUsers).not.toHaveBeenCalled();
@@ -217,12 +217,12 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
       state: 'connected',
     });
-    db.findUsers.mockResolvedValue([{ _id: { toString: () => 'user-b' } }]);
+    db.findUsers.mockResolvedValue([{ _id: { toString: () => '507f191e810c19729de860ea' } }]);
     db.updateConnectorInstallationGrants.mockResolvedValue(null);
 
     const response = await request(app)
       .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
-      .send({ expectedVersion: 4, principalIds: ['user-b'] });
+      .send({ expectedVersion: 4, principalIds: ['507f191e810c19729de860ea'] });
 
     expect(response.status).toBe(409);
   });
