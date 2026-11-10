@@ -56,13 +56,10 @@ describe('connector credential encryption rotation', () => {
       listConnectorCredentialsForRotation: jest.fn(async ({ afterId, limit }) =>
         rows.filter((row) => !afterId || row.id > afterId).slice(0, limit),
       ),
-      replaceConnectorCredentialForRotation: jest.fn(async ({ id, expectedEncryptedPayload }) => {
+      replaceConnectorCredentialForRotation: jest.fn(async ({ id, expectedEncryptedPayload, encryptedPayload }) => {
         const row = rows.find((item) => item.id === id);
         if (!row || row.encryptedPayload !== expectedEncryptedPayload) return false;
-        row.encryptedPayload = JSON.stringify({
-          ...JSON.parse(expectedEncryptedPayload),
-          keyId: 'key-2026-11',
-        });
+        row.encryptedPayload = encryptedPayload;
         return true;
       }),
     };
