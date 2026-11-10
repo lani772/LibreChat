@@ -16,6 +16,17 @@ export interface ConnectorRevocationRotationRecord {
 }
 
 export interface ConnectorRevocationMethods {
+  listGoogleWorkspaceRevocationDeadLetters(input: {
+    afterId?: string;
+    limit: number;
+  }): Promise<Array<{
+    id: string;
+    installationId: string;
+    attempts: number;
+    lastErrorCode: string | null;
+    updatedAt: Date;
+  }>>;
+  requeueGoogleWorkspaceRevocationDeadLetter(input: { id: string }): Promise<boolean>;
   listConnectorRevocationsForRotation(input: { afterId?: string; limit: number }): Promise<ConnectorRevocationRotationRecord[]>;
   replaceConnectorRevocationForRotation(input: {
     id: string;
@@ -131,6 +142,69 @@ export function createConnectorRevocationMethods(
         ],
       },
       { $set: { encryptedPayload: input.encryptedPayload } },
+      { runValidators: true },
+    ).exec();
+    return result.modifiedCount === 1;
+  }
+
+  async function listGoogleWorkspaceRevocationDeadLetters(input: {
+    afterId?: string;
+    limit: number;
+  }): Promise<Array<{
+    id: string;
+    installationId: string;
+    attempts: number;
+    lastErrorCode: string | null;
+    updatedAt: Date;
+  }>> {
+    if (getTenantId() !== SYSTEM_TENANT_ID) {
+      throw new Error('Dead-letter inspection requires explicit system context');
+    }
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+      throw new Error('Dead-letter page size must be between 1 and 100');
+    }
+    const filter: Record<string, unknown> = { state: 'dead' };
+    if (input.afterId) {
+      if (!mongoose.isValidObjectId(input.afterId)) throw new Error('Invalid dead-letter cursor');
+      filter._id = { $gt: input.afterId };
+    }
+    const rows = await Revocation.find(filter)
+      .select('installationId attempts lastErrorCode updatedAt')
+      .sort({ _id: 1 })
+      .limit(input.limit)
+      .lean<ConnectorRevocationDocument[]>()
+      .exec();
+    return rows.map((row) => ({
+      id: row._id.toString(),
+      installationId: row.installationId,
+      attempts: row.attempts,
+      lastErrorCode: row.lastErrorCode ?? null,
+      updatedAt: row.updatedAt,
+    }));
+  }
+
+  async function requeueGoogleWorkspaceRevocationDeadLetter(input: {
+    id: string;
+  }): Promise<boolean> {
+    if (getTenantId() !== SYSTEM_TENANT_ID) {
+      throw new Error('Dead-letter retry requires explicit system context');
+    }
+    if (!mongoose.isValidObjectId(input.id)) return false;
+    const result = await Revocation.updateOne(
+      {
+        _id: input.id,
+        state: 'dead',
+        encryptedPayload: { $exists: true, $ne: null },
+      },
+      {
+        $set: {
+          state: 'pending',
+          attempts: 0,
+          nextAttemptAt: new Date(),
+          lastErrorCode: null,
+        },
+        $unset: { leaseToken: 1, leaseUntil: 1 },
+      },
       { runValidators: true },
     ).exec();
     return result.modifiedCount === 1;
