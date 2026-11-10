@@ -15,6 +15,10 @@ runConnectorCredentialRotationCommand(process.argv.slice(2), {
       methods.listConnectorCredentialsForRotation(input),
     replaceConnectorCredentialForRotation: (input) =>
       methods.replaceConnectorCredentialForRotation(input),
+    listConnectorRevocationsForRotation: (input) =>
+      methods.listConnectorRevocationsForRotation(input),
+    replaceConnectorRevocationForRotation: (input) =>
+      methods.replaceConnectorRevocationForRotation(input),
   },
   write: console.log,
   writeError: console.error,
