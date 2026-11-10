@@ -15,7 +15,29 @@ function requireTenant(): string {
   return tenantId;
 }
 
+export interface ConnectorCredentialRotationRecord {
+  id: string;
+  tenantId: string;
+  installationId: string;
+  provider: string;
+  encryptedPayload: string;
+  updatedAt: Date;
+}
+
 export interface ConnectorCredentialMethods {
+  /** System-only bounded scan used by the credential key-rotation maintenance job. */
+  listConnectorCredentialsForRotation(input: {
+    afterId?: string;
+    limit: number;
+  }): Promise<ConnectorCredentialRotationRecord[]>;
+  /** Compare-and-set replacement; never overwrites a concurrent refresh or credential update. */
+  replaceConnectorCredentialForRotation(input: {
+    id: string;
+    tenantId: string;
+    expectedEncryptedPayload: string;
+    expectedUpdatedAt: Date;
+    encryptedPayload: string;
+  }): Promise<boolean>;
   putConnectorCredential(input: {
     installationId: string;
     provider: string;
@@ -36,6 +58,78 @@ export function createConnectorCredentialMethods(
 ): ConnectorCredentialMethods {
   const Credential = mongoose.models.ConnectorCredential as Model<ConnectorCredentialDocument>;
   const Installation = mongoose.models.ConnectorInstallation as Model<ConnectorInstallationDocument>;
+
+  function requireSystemRotationContext(): void {
+    if (getTenantId() !== SYSTEM_TENANT_ID) {
+      throw new Error('Credential key rotation requires explicit system context');
+    }
+  }
+
+  async function listConnectorCredentialsForRotation(input: {
+    afterId?: string;
+    limit: number;
+  }): Promise<ConnectorCredentialRotationRecord[]> {
+    requireSystemRotationContext();
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+      throw new Error('Credential rotation batch size must be between 1 and 100');
+    }
+    const filter: Record<string, unknown> = {
+      $or: [
+        { refreshLeaseUntil: { $exists: false } },
+        { refreshLeaseUntil: null },
+        { refreshLeaseUntil: { $lte: new Date() } },
+      ],
+    };
+    if (input.afterId) {
+      if (!mongoose.isValidObjectId(input.afterId)) throw new Error('Invalid credential rotation cursor');
+      filter._id = { $gt: input.afterId };
+    }
+    const rows = await Credential.find(filter)
+      .select('+encryptedPayload tenantId installationId provider updatedAt')
+      .sort({ _id: 1 })
+      .limit(input.limit)
+      .lean<Array<ConnectorCredentialDocument & { updatedAt: Date }>>()
+      .exec();
+    return rows.map((row) => ({
+      id: row._id.toString(),
+      tenantId: row.tenantId,
+      installationId: row.installationId,
+      provider: row.provider,
+      encryptedPayload: row.encryptedPayload,
+      updatedAt: row.updatedAt,
+    }));
+  }
+
+  async function replaceConnectorCredentialForRotation(input: {
+    id: string;
+    tenantId: string;
+    expectedEncryptedPayload: string;
+    expectedUpdatedAt: Date;
+    encryptedPayload: string;
+  }): Promise<boolean> {
+    requireSystemRotationContext();
+    if (!mongoose.isValidObjectId(input.id) || !input.tenantId ||
+        !input.expectedEncryptedPayload || !input.encryptedPayload ||
+        input.encryptedPayload.length > 140_000) {
+      throw new Error('Invalid credential rotation update');
+    }
+    const result = await Credential.updateOne(
+      {
+        _id: input.id,
+        tenantId: input.tenantId,
+        encryptedPayload: input.expectedEncryptedPayload,
+        updatedAt: input.expectedUpdatedAt,
+        $or: [
+          { refreshLeaseUntil: { $exists: false } },
+          { refreshLeaseUntil: null },
+          { refreshLeaseUntil: { $lte: new Date() } },
+        ],
+      },
+      { $set: { encryptedPayload: input.encryptedPayload, keyVersion: 'gcm1' } },
+      { runValidators: true },
+    ).exec();
+    return result.modifiedCount === 1;
+  }
 
   async function putConnectorCredential(input: {
     installationId: string;
@@ -157,5 +251,5 @@ export function createConnectorCredentialMethods(
     return result.modifiedCount === 1;
   }
 
-  return { putConnectorCredential, getConnectorCredentialCiphertext, deleteConnectorCredential, claimConnectorCredentialRefresh, releaseConnectorCredentialRefresh };
+  return { listConnectorCredentialsForRotation, replaceConnectorCredentialForRotation, putConnectorCredential, getConnectorCredentialCiphertext, deleteConnectorCredential, claimConnectorCredentialRefresh, releaseConnectorCredentialRefresh };
 }
