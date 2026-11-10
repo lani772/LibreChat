@@ -224,7 +224,8 @@ export function createConnectorInstallationMethods(
       throw new Error('Connector health batch size must be between 1 and 25');
     }
     const providers = options.providers?.map((provider) => provider.trim().toLowerCase()).filter(Boolean);
-    if (options.providers && (!providers?.length || providers.length > 20)) {
+    if (options.providers && (!providers?.length || providers.length > 20 ||
+        providers.some((provider) => !PROVIDER_PATTERN.test(provider)))) {
       throw new Error('Connector health provider filter is invalid');
     }
     return Model.find({
