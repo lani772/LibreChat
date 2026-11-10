@@ -49,7 +49,7 @@ describe('GoogleWorkspaceConnections', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
   });
 
-  it('submits owner-managed tenant grants with the installation version', async () => {
+  it('searches tenant members and submits selected member grants with the installation version', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -65,6 +65,17 @@ describe('GoogleWorkspaceConnections', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        json: async () => ({
+          members: [{
+            id: '507f191e810c19729de860ea',
+            name: 'Member A',
+            username: 'membera',
+            email: 'membera@example.test',
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: async () => ({ version: 5 }),
       })
       .mockResolvedValueOnce({
@@ -74,11 +85,20 @@ describe('GoogleWorkspaceConnections', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     render(<GoogleWorkspaceConnections />);
-    const input = await screen.findByLabelText('Tenant member user IDs for Work Drive');
-    fireEvent.change(input, { target: { value: '507f191e810c19729de860ea' } });
+    const search = await screen.findByLabelText('Find tenant members by name, username, or email');
+    fireEvent.change(search, { target: { value: 'member' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find' }));
+
+    const checkbox = await screen.findByRole('checkbox');
+    expect(screen.getByText('membera@example.test')).toBeInTheDocument();
+    fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole('button', { name: 'Save sharing' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/connectors/google-workspace/507f1f77bcf86cd799439011/members?q=member',
+      expect.objectContaining({ credentials: 'include', cache: 'no-store' }),
+    ));
+    expect(fetchMock).toHaveBeenCalledWith(
       '/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants',
       expect.objectContaining({
         method: 'PUT',
@@ -88,7 +108,7 @@ describe('GoogleWorkspaceConnections', () => {
           principalIds: ['507f191e810c19729de860ea'],
         }),
       }),
-    ));
+    );
     expect(await screen.findByRole('status')).toHaveTextContent('Connector sharing permissions updated.');
   });
 
