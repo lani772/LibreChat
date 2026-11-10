@@ -108,6 +108,32 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
     expect(await HealthJob.countDocuments({})).toBe(3);
   });
 
+  it('rejects an installation owned by a different user in the same tenant', async () => {
+    const storedJob = await createPendingJob({
+      status: 'processing',
+      leaseToken: 'current-token',
+      leaseUntil: new Date(Date.now() + 60_000),
+      fence: 2,
+    });
+    const job = storedJob.toObject();
+    const monitor = { checkInstallation: jest.fn() };
+    const db = {
+      getConnectorInstallation: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-a',
+        ownerUserId: 'owner-b',
+        provider: 'google-workspace',
+        state: 'connected',
+      }),
+    };
+
+    await worker.processClaim(job, monitor, db);
+
+    expect(monitor.checkInstallation).not.toHaveBeenCalled();
+    const persisted = await HealthJob.findById(job._id).lean();
+    expect(persisted.status).toBe('completed');
+    expect(persisted.lastErrorCode).toBe('installation_not_eligible');
+  });
+
   it('does not probe an installation whose persisted owner or tenant differs from the job', async () => {
     const storedJob = await createPendingJob({
       status: 'processing',
