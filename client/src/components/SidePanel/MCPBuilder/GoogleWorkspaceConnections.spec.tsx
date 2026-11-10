@@ -49,6 +49,29 @@ describe('GoogleWorkspaceConnections', () => {
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
   });
 
+  it('shows the last health observation and consecutive failure count', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        installations: [{
+          id: '507f1f77bcf86cd799439011',
+          displayName: 'Health monitored Drive',
+          state: 'degraded',
+          version: 3,
+          lastHealthCheckAt: '2026-11-09T10:00:00.000Z',
+          lastSuccessfulHealthCheckAt: '2026-11-09T09:55:00.000Z',
+          consecutiveHealthFailures: 2,
+          lastErrorCode: 'provider_unavailable',
+          grantedPrincipalIds: [],
+        }],
+      }),
+    }) as unknown as typeof fetch;
+    render(<GoogleWorkspaceConnections />);
+    expect(await screen.findByText(/Consecutive failures: 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Last check:/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check health' })).toBeInTheDocument();
+  });
+
   it('searches tenant members and submits selected member grants with the installation version', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({
