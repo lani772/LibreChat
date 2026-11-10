@@ -51,7 +51,8 @@ export async function runConnectorCredentialRotationCli(
     maxBatches === undefined ||
     maxBatches < 1 ||
     maxBatches > 100 ||
-    (afterId !== undefined && !/^[a-f\d]{24}$/i.test(afterId))
+    (afterId !== undefined && !/^[a-f\d]{24}$/i.test(afterId)) ||
+    (afterRevocationId !== undefined && !/^[a-f\d]{24}$/i.test(afterRevocationId))
   ) {
     deps.writeError(usage);
     return 2;
