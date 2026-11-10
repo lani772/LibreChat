@@ -9,6 +9,8 @@ on:
       - 'api/server/services/ConnectorHealthJobWorker*.spec.js'
       - 'api/server/routes/connectors.js'
       - 'api/server/routes/__tests__/connectors.spec.js'
+      - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.tsx'
+      - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.spec.tsx'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
       - '.github/workflows/connector-health-worker.yml'
@@ -62,3 +64,13 @@ jobs:
           server/services/ConnectorHealthJobWorker.spec.js
           server/services/ConnectorHealthJobWorker.integration.spec.js
           server/routes/__tests__/connectors.spec.js
+
+      - name: Run retry-policy tests
+        run: >-
+          npm run test:ci --workspace @librechat/api -- --runInBand
+          src/connectors/ConnectorHealthRetryPolicy.spec.ts
+
+      - name: Run Google Workspace connection UI tests
+        run: >-
+          npm run test:ci --workspace client -- --runInBand
+          src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.spec.tsx
