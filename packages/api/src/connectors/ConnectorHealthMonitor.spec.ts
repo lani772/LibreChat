@@ -85,4 +85,23 @@ describe('ConnectorHealthMonitor', () => {
     await expect(monitor.checkBatch(5)).resolves.toMatchObject({ checked: 0, healthy: 0 });
     expect(store.listConnectorHealthCandidates).not.toHaveBeenCalled();
   });
+
+  it('does not count an authorization denial as a provider health failure', async () => {
+    const recordConnectorHealth = jest.fn();
+    const store = {
+      getConnectorInstallation: jest.fn().mockResolvedValue(installation()),
+      listConnectorHealthCandidates: jest.fn().mockResolvedValue([]),
+      recordConnectorHealth,
+    };
+    const monitor = new ConnectorHealthMonitor(store, {
+      'google-workspace': async () => {
+        throw Object.assign(new Error('not authorized'), { code: 'CONNECTOR_ACCESS_DENIED' });
+      },
+    });
+    await expect(monitor.checkInstallation(id)).resolves.toMatchObject({
+      status: 'skipped', state: 'connected', consecutiveFailures: 0, errorCode: null,
+    });
+    expect(recordConnectorHealth).not.toHaveBeenCalled();
+  });
+
 });
