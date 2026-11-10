@@ -2632,6 +2632,13 @@ Please follow these instructions when using tools from the respective MCP server
   async validateAppBinding(context: MCPAppValidationContext): Promise<{ valid: true }> {
     context.signal?.throwIfAborted();
     const config = this.getAppServerConfig(context);
+    // Validation is a separate MCP App endpoint from resource and tool proxying.
+    // Do not report a connector-backed app binding as valid after its installation
+    // has been revoked or its tenant/owner permissions have changed.
+    if (this.connectorAuthorizationGuard) {
+      await this.connectorAuthorizationGuard(config);
+    }
+    context.signal?.throwIfAborted();
     const currentOptions = processMCPEnv({
       user: context.user,
       dbSourced: isUserSourced(config),
