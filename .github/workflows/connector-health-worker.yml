@@ -1,0 +1,58 @@
+name: Connector health worker reliability
+
+on:
+  push:
+    branches:
+      - feat/saas-mcp-platform-foundation
+    paths:
+      - 'api/server/services/ConnectorHealthJobWorker.js'
+      - 'api/server/services/ConnectorHealthJobWorker*.spec.js'
+      - 'api/server/routes/connectors.js'
+      - 'api/server/routes/__tests__/connectors.spec.js'
+      - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
+      - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
+      - '.github/workflows/connector-health-worker.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'api/server/services/ConnectorHealthJobWorker.js'
+      - 'api/server/services/ConnectorHealthJobWorker*.spec.js'
+      - 'api/server/routes/connectors.js'
+      - 'api/server/routes/__tests__/connectors.spec.js'
+      - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
+      - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
+      - '.github/workflows/connector-health-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-health-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  health-worker-tests:
+    name: MongoDB worker and route tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run worker unit, MongoDB concurrency, and connector route tests
+        run: >-
+          npm run test --workspace api -- --runInBand
+          api/server/services/ConnectorHealthJobWorker.spec.js
+          api/server/services/ConnectorHealthJobWorker.integration.spec.js
+          api/server/routes/__tests__/connectors.spec.js
