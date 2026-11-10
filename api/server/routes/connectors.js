@@ -93,6 +93,84 @@ router.post('/google-workspace', loginLimiter, requireJwtAuth, requireSameOrigin
   }
 });
 
+/**
+ * Replaces the explicit principal grant list for an owned personal installation.
+ * Candidate users are resolved through the tenant-isolated User model; IDs supplied
+ * by the browser are never treated as proof of tenant membership.
+ */
+router.put(
+  '/google-workspace/:installationId/grants',
+  loginLimiter,
+  requireJwtAuth,
+  requireSameOrigin,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const tenantId = getTenantId();
+    const principalId = getUserId();
+    const { installationId } = req.params;
+    const expectedVersion = req.body?.expectedVersion;
+    const principalIds = req.body?.principalIds;
+    if (
+      !tenantId ||
+      !principalId ||
+      !/^[a-f\\d]{24}$/i.test(installationId) ||
+      !Number.isInteger(expectedVersion) ||
+      expectedVersion < 0 ||
+      !Array.isArray(principalIds) ||
+      principalIds.length > 100 ||
+      principalIds.some((id) => typeof id !== 'string' || !id.trim() || id.trim().length > 128)
+    ) {
+      return res.status(400).json({ error: 'Invalid connector grant request' });
+    }
+    const normalizedIds = [...new Set(principalIds.map((id) => id.trim()))];
+    if (normalizedIds.includes(principalId)) {
+      return res.status(400).json({ error: 'The connector owner does not need an explicit grant' });
+    }
+    try {
+      const installation = await db.getConnectorInstallation(installationId);
+      if (
+        !installation ||
+        installation.tenantId !== tenantId ||
+        installation.ownerUserId !== principalId ||
+        installation.provider !== 'google-workspace' ||
+        installation.visibility !== 'personal' ||
+        installation.state === 'revoked'
+      ) {
+        return res.status(404).json({ error: 'Connector installation is unavailable' });
+      }
+
+      // User.findUsers is tenant-isolated by the existing User schema plugin.
+      const members = normalizedIds.length === 0
+        ? []
+        : await db.findUsers(
+            { _id: { $in: normalizedIds } },
+            '_id',
+            { limit: 100 },
+          );
+      const memberIds = new Set(members.map((member) => member._id.toString()));
+      if (normalizedIds.some((id) => !memberIds.has(id))) {
+        return res.status(400).json({ error: 'One or more selected users are not members of this tenant' });
+      }
+
+      const updated = await db.updateConnectorInstallationGrants({
+        installationId,
+        expectedVersion,
+        principalIds: normalizedIds,
+      });
+      if (!updated) {
+        return res.status(409).json({ error: 'Connector grants changed; refresh and try again' });
+      }
+      return res.status(200).json({
+        installationId: updated._id.toString(),
+        grantedPrincipalIds: updated.grantedPrincipalIds,
+        version: updated.version,
+      });
+    } catch {
+      return res.status(503).json({ error: 'Unable to update connector grants' });
+    }
+  },
+);
+
 router.get(
   '/google-workspace/:installationId/status',
   loginLimiter,
