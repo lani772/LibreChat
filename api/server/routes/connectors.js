@@ -389,6 +389,14 @@ router.post(
       ) {
         return res.status(404).json({ error: 'Connector health job is unavailable' });
       }
+      if (!['connected', 'degraded'].includes(installation.state)) {
+        return res.status(409).json({
+          error: installation.state === 'error' && installation.lastErrorCode === 'google_reauthorization_required'
+            ? 'Reconnect Google Workspace before retrying this health check'
+            : 'This connector is not eligible for a health check',
+          reauthorizationRequired: installation.state === 'error' && installation.lastErrorCode === 'google_reauthorization_required',
+        });
+      }
       const job = await retryOwnerDeadHealthJob({ installationId, jobId });
       if (!job) return res.status(404).json({ error: 'Dead connector health job is unavailable' });
       return res.status(202).json({ job });
