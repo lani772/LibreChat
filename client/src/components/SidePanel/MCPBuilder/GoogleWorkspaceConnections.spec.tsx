@@ -72,6 +72,93 @@ describe('GoogleWorkspaceConnections', () => {
     expect(screen.getByRole('button', { name: 'Check health' })).toBeInTheDocument();
   });
 
+  it('shows queued health jobs and lets the owner retry a dead job', async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          installations: [{
+            id: '507f1f77bcf86cd799439011',
+            displayName: 'Recovery Drive',
+            state: 'connected',
+            version: 2,
+            grantedPrincipalIds: [],
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          jobs: [{
+            id: '507f1f77bcf86cd799439012',
+            status: 'dead',
+            attempt: 5,
+            nextAttemptAt: '2026-11-10T06:00:00.000Z',
+            lastErrorCode: 'provider_unavailable',
+            reauthorizationRequired: false,
+            createdAt: '2026-11-10T05:00:00.000Z',
+            updatedAt: '2026-11-10T06:00:00.000Z',
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ job: { id: '507f1f77bcf86cd799439012', status: 'pending' } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ installations: [] }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<GoogleWorkspaceConnections />);
+    expect(await screen.findByText(/dead · Attempt 5/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/connectors/google-workspace/507f1f77bcf86cd799439011/health-jobs/507f1f77bcf86cd799439012/retry',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    ));
+    expect(await screen.findByRole('status')).toHaveTextContent('Health check recovery has been scheduled.');
+  });
+
+  it('shows reauthorization guidance for a health job that requires renewed consent', async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          installations: [{
+            id: '507f1f77bcf86cd799439011',
+            displayName: 'Consent Drive',
+            state: 'error',
+            version: 2,
+            grantedPrincipalIds: [],
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          jobs: [{
+            id: '507f1f77bcf86cd799439012',
+            status: 'dead',
+            attempt: 1,
+            nextAttemptAt: '2026-11-10T06:00:00.000Z',
+            lastErrorCode: 'google_reauthorization_required',
+            reauthorizationRequired: true,
+            createdAt: '2026-11-10T05:00:00.000Z',
+            updatedAt: '2026-11-10T06:00:00.000Z',
+          }],
+        }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<GoogleWorkspaceConnections />);
+    expect(await screen.findByText('Reconnect Google to resume checks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Authorize' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
   it('searches tenant members and submits selected member grants with the installation version', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({
@@ -85,6 +172,10 @@ describe('GoogleWorkspaceConnections', () => {
             grantedPrincipalIds: [],
           }],
         }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ jobs: [] }),
       })
       .mockResolvedValueOnce({
         ok: true,
