@@ -378,8 +378,8 @@ describe('connector installation persistence', () => {
 
     const first = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
-        installationId: String(created._id), expectedVersion: 2,
-        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2, expectedHealthVersion: 0,
+        installationId: String(created._id), expectedHealthVersion: 0,
+        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2,
       }),
     );
     expect(first).toMatchObject({ state: 'connected', consecutiveHealthFailures: 1, healthVersion: 1, version: 2 });
@@ -412,7 +412,7 @@ describe('connector installation persistence', () => {
     );
     await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
-        installationId: String(created._id), expectedVersion: 2,
+        installationId: String(created._id), expectedHealthVersion: 0,
         outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 1,
       }),
     );
