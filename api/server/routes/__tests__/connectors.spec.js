@@ -290,6 +290,12 @@ describe('Google Workspace connector routes', () => {
       limit: 20,
       fieldsToSelect: '_id name username email',
     });
+    expect(db.findUsers).toHaveBeenCalledWith(
+      { _id: { $in: [] } },
+      '_id name username email',
+      { limit: 100 },
+    );
+    expect(response.headers['cache-control']).toContain('no-store');
     expect(response.body.members).toEqual([
       {
         id: '507f191e810c19729de860ec',
