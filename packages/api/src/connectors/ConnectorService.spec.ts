@@ -227,4 +227,16 @@ describe('ConnectorService', () => {
     expect(getConnectorInstallation).toHaveBeenCalledTimes(2);
   });
 
+
+  it('permits an authorized health probe on a degraded connector but denies ordinary execution', async () => {
+    const test = setup({ record: installation({ state: 'degraded' }) });
+    await expect(test.run(() => test.service.authorize('installation-id')))
+      .rejects.toBeInstanceOf(ConnectorAccessError);
+    await expect(test.run(() => test.service.executeHealthCheck('installation-id', async () => 'healthy')))
+      .resolves.toBe('healthy');
+    expect(test.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'allowed', provider: 'google-workspace' }),
+    );
+  });
+
 });
