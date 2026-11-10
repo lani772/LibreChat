@@ -445,4 +445,50 @@ describe('connector installation persistence', () => {
   });
 
 
+  it('supports legacy health records and schedules the oldest health observation first', async () => {
+    const makeConnected = async (displayName: string) => {
+      const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+        methods().createConnectorInstallation({
+          provider: 'google-workspace', displayName, visibility: 'personal',
+        }),
+      );
+      await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+        methods().transitionConnectorInstallation({
+          installationId: String(created._id), expectedVersion: 0, state: 'authorizing',
+        }),
+      );
+      await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+        methods().transitionConnectorInstallation({
+          installationId: String(created._id), expectedVersion: 1, state: 'connected',
+        }),
+      );
+      return created;
+    };
+
+    const legacy = await makeConnected('Legacy health record');
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      mongoose.models.ConnectorInstallation.updateOne(
+        { _id: legacy._id }, { $unset: { healthVersion: '' } },
+      ).exec(),
+    );
+    const observed = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(legacy._id), expectedHealthVersion: 0, outcome: 'healthy',
+      }),
+    );
+    expect(observed?.healthVersion).toBe(1);
+
+    const recentlyChecked = await makeConnected('Recently checked');
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      mongoose.models.ConnectorInstallation.updateOne(
+        { _id: recentlyChecked._id }, { $set: { lastHealthCheckAt: new Date() } },
+      ).exec(),
+    );
+    const candidates = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().listConnectorHealthCandidates({ limit: 10 }),
+    );
+    expect(candidates[0]._id.toString()).toBe(String(legacy._id));
+  });
+
+
 });
