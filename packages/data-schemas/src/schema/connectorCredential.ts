@@ -1,7 +1,7 @@
 import { Schema } from 'mongoose';
 import type { ConnectorCredentialDocument } from '~/types/connectorCredential';
 
-const connectorCredentialSchema = new Schema<ConnectorCredentialDocument>(
+const connectorCredentialSchema: Schema<ConnectorCredentialDocument> = new Schema<ConnectorCredentialDocument>(
   {
     tenantId: { type: String, required: true, index: true },
     installationId: { type: String, required: true, match: /^[a-f\d]{24}$/i },
