@@ -17,7 +17,7 @@ function setNoStoreHeaders(res) {
  * The tenant and principal come from the authenticated request context; the
  * role is re-read from the tenant-isolated User/Role models on every request.
  */
-async function requireTenantAdmin(req, res, next) {
+async function requireTenantAdmin(_req, res, next) {
   const tenantId = getTenantId();
   const principalId = getUserId();
   if (!tenantId || tenantId === '__SYSTEM__' || !principalId) {
@@ -35,7 +35,7 @@ async function requireTenantAdmin(req, res, next) {
 }
 
 /** Safe tenant-wide inventory; credential references and all secret fields are omitted. */
-router.get('/installations', loginLimiter, requireJwtAuth, requireTenantAdmin, async (req, res) => {
+router.get('/installations', loginLimiter, requireJwtAuth, requireTenantAdmin, async (_req, res) => {
   setNoStoreHeaders(res);
   try {
     const installations = await db.listConnectorInstallations({ limit: MAX_PAGE_SIZE });
