@@ -46,6 +46,10 @@ async function enqueueOwnerHealthCheck({ installationId, provider = 'google-work
   if (!/^[a-f\d]{24}$/i.test(installationId) || provider !== 'google-workspace') {
     throw new Error('Invalid connector health job target');
   }
+  if (!Number.isFinite(delayMs) || delayMs < 0 || delayMs > 7 * 24 * 60 * 60_000) {
+    throw new Error('Connector health job delay is invalid');
+  }
+  await indexesReady;
   const activeKey = trustedActiveKey(tenantId, ownerUserId, installationId);
   const now = new Date();
   try {
