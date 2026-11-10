@@ -1,7 +1,10 @@
 const mockModel = {
   createIndexes: jest.fn().mockResolvedValue(undefined),
   findOneAndUpdate: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
-  findOne: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
+  findOne: jest.fn(() => ({
+    select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(null) }) }),
+    lean: () => ({ exec: jest.fn().mockResolvedValue(null) }),
+  })),
   find: jest.fn(() => ({ sort: () => ({ limit: () => ({ select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue([{ _id: 'job-1', status: 'dead', attempt: 5, lastErrorCode: 'google_reauthorization_required' }]) }) }) }) }) })),
 };
 let mockTenantId = 'tenant-a';
@@ -25,6 +28,8 @@ jest.mock('@librechat/data-schemas', () => ({
   getUserId: () => mockUserId,
   runAsSystem: (operation) => operation(),
 }));
+
+jest.mock('~/models', () => ({ recordAuditEntry: jest.fn().mockResolvedValue({}) }));
 
 jest.mock('@librechat/api', () => ({
   ConnectorHealthRetryPolicy: class {
