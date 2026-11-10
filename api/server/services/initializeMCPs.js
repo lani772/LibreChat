@@ -25,6 +25,7 @@ const {
 } = require('@librechat/api');
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
 const { startMCPAuthorizationFenceRetryWorker } = require('./MCPAuthorizationFenceRetry');
+const { startGoogleWorkspaceRevocationWorker } = require('./GoogleWorkspaceRevocationWorker');
 const {
   getMCPToolsCacheGeneration,
   renewMCPToolsCacheGeneration,
@@ -171,6 +172,7 @@ async function initializeMCPs() {
     ) {
       try {
         await mongoose.models.GoogleOAuthState.createIndexes();
+        await mongoose.models.ConnectorRevocation.createIndexes();
         const adapter = new GoogleWorkspaceOAuthAdapter({
           clientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID,
           clientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET,
@@ -178,6 +180,10 @@ async function initializeMCPs() {
         googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
           adapter,
           vault: connectorCredentialVault,
+          revocations: {
+            enqueueGoogleWorkspaceRevocation: (input) =>
+              db.enqueueGoogleWorkspaceRevocation(input),
+          },
           installations: {
             getConnectorInstallation: (installationId) =>
               db.getConnectorInstallation(installationId),
@@ -240,6 +246,8 @@ async function initializeMCPs() {
               db.revokeConnectorInstallation(installationId),
           },
         });
+        const stopGoogleRevocationWorker = startGoogleWorkspaceRevocationWorker(adapter);
+        registerShutdownTask('Google Workspace revocation worker', stopGoogleRevocationWorker);
         googleDriveReadOnlyConnector = new GoogleDriveReadOnlyConnector({
           connectors: connectorService,
           tokenLifecycle: googleWorkspaceTokenLifecycle,
