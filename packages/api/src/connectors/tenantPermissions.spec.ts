@@ -112,10 +112,10 @@ describe('tenant connector role permission resolver', () => {
     const getPartitionRole = jest
       .fn()
       .mockResolvedValueOnce({
-        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: true } },
+        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.INVOKE_CONNECTORS]: true } },
       })
       .mockResolvedValueOnce({
-        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.USE]: false } },
+        permissions: { [PermissionTypes.MCP_SERVERS]: { [Permissions.INVOKE_CONNECTORS]: false } },
       });
     const resolve = createTenantConnectorPermissionResolver({ getUserById, getPartitionRole });
 
