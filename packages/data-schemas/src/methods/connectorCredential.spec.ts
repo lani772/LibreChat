@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { tenantStorage } from '~/config/tenantContext';
+import { runAsSystem, tenantStorage } from '~/config/tenantContext';
 import { createConnectorInstallationModel } from '~/models/connectorInstallation';
 import { createConnectorCredentialModel } from '~/models/connectorCredential';
 import { createConnectorCredentialMethods } from './connectorCredential';
@@ -234,4 +234,86 @@ describe('connector credential persistence', () => {
       ),
     ).resolves.toEqual({ deleted: true });
   });
+  it('restricts credential rotation scans to explicit system context', async () => {
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+        methods().listConnectorCredentialsForRotation({ limit: 10 }),
+      ),
+    ).rejects.toThrow('explicit system context');
+  });
+
+  it('scans bounded credential batches across tenants only in system context', async () => {
+    const first = await createInstallation('tenant-a', 'owner-a');
+    const second = await createInstallation('tenant-b', 'owner-b');
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().putConnectorCredential({
+        installationId: String(first._id),
+        provider: 'chatwoot',
+        encryptedPayload: 'ciphertext-a',
+        keyVersion: 'gcm1',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-b', userId: 'owner-b' }, () =>
+      methods().putConnectorCredential({
+        installationId: String(second._id),
+        provider: 'chatwoot',
+        encryptedPayload: 'ciphertext-b',
+        keyVersion: 'gcm1',
+      }),
+    );
+
+    const rows = await runAsSystem(async () =>
+      methods().listConnectorCredentialsForRotation({ limit: 1 }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      tenantId: 'tenant-a',
+      installationId: String(first._id),
+      encryptedPayload: 'ciphertext-a',
+    });
+  });
+
+  it('uses compare-and-set to replace ciphertext without overwriting concurrent writes', async () => {
+    const installation = await createInstallation();
+    const installationId = String(installation._id);
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().putConnectorCredential({
+        installationId,
+        provider: 'chatwoot',
+        encryptedPayload: 'old-ciphertext',
+        keyVersion: 'gcm1',
+      }),
+    );
+    const [record] = await runAsSystem(async () =>
+      methods().listConnectorCredentialsForRotation({ limit: 10 }),
+    );
+    expect(record).toBeDefined();
+    const changed = await runAsSystem(async () =>
+      methods().replaceConnectorCredentialForRotation({
+        id: record.id,
+        tenantId: record.tenantId,
+        expectedEncryptedPayload: record.encryptedPayload,
+        expectedUpdatedAt: record.updatedAt,
+        encryptedPayload: 'new-ciphertext',
+      }),
+    );
+    expect(changed).toBe(true);
+    const [updated] = await runAsSystem(async () =>
+      methods().listConnectorCredentialsForRotation({ limit: 10 }),
+    );
+    expect(updated.encryptedPayload).toBe('new-ciphertext');
+
+    const stale = await runAsSystem(async () =>
+      methods().replaceConnectorCredentialForRotation({
+        id: record.id,
+        tenantId: record.tenantId,
+        expectedEncryptedPayload: 'old-ciphertext',
+        expectedUpdatedAt: record.updatedAt,
+        encryptedPayload: 'stale-ciphertext',
+      }),
+    );
+    expect(stale).toBe(false);
+    expect(updated.encryptedPayload).toBe('new-ciphertext');
+  });
+
 });
