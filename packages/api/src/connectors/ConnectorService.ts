@@ -65,6 +65,18 @@ export class ConnectorService {
   }
 
   public async authorize(installationId: string): Promise<AuthorizedConnector> {
+    return this.authorizeWithHealthPolicy(installationId, false);
+  }
+
+  /** Allows a degraded connector only for an explicit health probe, never for tool calls. */
+  public async authorizeHealthCheck(installationId: string): Promise<AuthorizedConnector> {
+    return this.authorizeWithHealthPolicy(installationId, true);
+  }
+
+  private async authorizeWithHealthPolicy(
+    installationId: string,
+    healthCheck: boolean,
+  ): Promise<AuthorizedConnector> {
     const { tenantId, principalId } = this.getTrustedIdentity();
     let installation: ConnectorInstallationDocument | null;
     try {
@@ -101,7 +113,7 @@ export class ConnectorService {
       tenantId: installation.tenantId,
       ownerId: installation.ownerUserId,
       visibility: installation.visibility,
-      state: installation.state,
+      state: healthCheck && installation.state === 'degraded' ? 'connected' : installation.state,
       grantedPrincipalIds: installation.grantedPrincipalIds,
     };
     const decision = authorizeConnectorInvocation(
@@ -123,6 +135,15 @@ export class ConnectorService {
     const safeInstallation = { ...installation };
     delete safeInstallation.credentialRef;
     return { installation: safeInstallation, tenantId, principalId };
+  }
+
+  /** Explicit health probes can inspect a degraded connector after owner/grant authorization. */
+  public async executeHealthCheck<TResult>(
+    installationId: string,
+    operation: (connector: AuthorizedConnector) => Promise<TResult>,
+  ): Promise<TResult> {
+    const authorized = await this.authorizeHealthCheck(installationId);
+    return operation(authorized);
   }
 
   /** Callback (including credential lookup) is reached only after authorization and audit. */
