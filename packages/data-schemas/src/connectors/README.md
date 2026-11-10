@@ -33,3 +33,8 @@ Tenant-shared connector invocation requires the dedicated `MCP_SERVERS.INVOKE_CO
 - KMS/HSM-backed key management and automated key rotation/re-encryption are not yet implemented. Plan a coordinated re-encryption migration before rotating the active key.
 - Installation revocation disables authorization before ciphertext deletion. If deletion fails, the installation remains unusable; retry cleanup through the owner-scoped delete operation.
 - Tests have been authored for encryption integrity, context binding, tenant isolation, owner checks, authorization-before-decryption, and revocation cleanup. They still need to be executed in a configured checkout.
+
+
+## Remote revocation outbox
+
+Google Workspace remote revocation jobs live in the tenant-isolated `connectorrevocations` collection. The record stores only an encrypted copy of the credential envelope, provider/installation metadata, retry state, and a short worker lease. The unique tenant/installation index makes enqueue idempotent; the due/lease index supports atomic claims. Only the authenticated installation owner can enqueue. Worker scan, claim, installation-state check, completion, and retry methods require explicit system context. Completion clears ciphertext; retry retains it until success or dead-letter status. The collection is registered with model creation and tenant index migration.
