@@ -92,6 +92,10 @@ export async function runGoogleWorkspaceRevocationDeadLetterCli(
       };
     });
     deps.write(JSON.stringify(result));
+    if (command === 'retry' && (result as { requeued?: boolean }).requeued !== true) {
+      deps.writeError('Dead letter was not requeued; verify the ID, ciphertext retention, and revoked installation state.');
+      return 1;
+    }
     return 0;
   } finally {
     if (connected) await deps.disconnect();
