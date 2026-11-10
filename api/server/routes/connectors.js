@@ -6,6 +6,7 @@ const {
   getGoogleWorkspaceOAuthFlow,
   getGoogleWorkspaceTokenLifecycle,
   getGoogleDriveReadOnlyConnector,
+  getConnectorHealthMonitor,
 } = require('~/server/services/initializeMCPs');
 
 const router = Router();
@@ -321,6 +322,50 @@ router.get(
       return res.status(200).json(file);
     } catch (error) {
       return sendDriveError(res, error);
+    }
+  },
+);
+
+
+/** Owner-triggered health probe; authorization still runs through the provider connector. */
+router.post(
+  '/google-workspace/:installationId/health-check',
+  loginLimiter,
+  requireJwtAuth,
+  requireSameOrigin,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const tenantId = getTenantId();
+    const principalId = getUserId();
+    const { installationId } = req.params;
+    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+      return res.status(404).json({ error: 'Connector installation is unavailable' });
+    }
+    try {
+      const installation = await db.getConnectorInstallation(installationId);
+      if (
+        !installation ||
+        installation.tenantId !== tenantId ||
+        installation.ownerUserId !== principalId ||
+        installation.provider !== 'google-workspace'
+      ) {
+        return res.status(404).json({ error: 'Connector installation is unavailable' });
+      }
+      const monitor = getConnectorHealthMonitor();
+      if (!monitor) return res.status(503).json({ error: 'Connector health checks are not configured' });
+      const result = await monitor.checkInstallation(installationId);
+      if (result.status === 'stale' || result.status === 'skipped') {
+        return res.status(409).json({ error: 'Connector state changed; refresh and retry' });
+      }
+      return res.status(200).json({
+        installationId: result.installationId,
+        healthy: result.status === 'healthy',
+        state: result.state,
+        consecutiveFailures: result.consecutiveFailures,
+        errorCode: result.errorCode,
+      });
+    } catch {
+      return res.status(503).json({ error: 'Connector health check is temporarily unavailable' });
     }
   },
 );
