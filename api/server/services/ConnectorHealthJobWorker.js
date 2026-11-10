@@ -68,6 +68,34 @@ async function enqueueOwnerHealthCheck({ installationId, provider = 'google-work
   }
 }
 
+/** Returns a safe, bounded operational projection for the authenticated owner. */
+async function listOwnerHealthJobs({ installationId, limit = 10 }) {
+  const tenantId = getTenantId();
+  const ownerUserId = getUserId();
+  if (!tenantId || !ownerUserId || tenantId === '__SYSTEM__') {
+    throw new Error('Health job visibility requires an authenticated tenant owner context');
+  }
+  if (!/^[a-f\\d]{24}$/i.test(installationId) || !Number.isInteger(limit) || limit < 1 || limit > 20) {
+    throw new Error('Invalid connector health job query');
+  }
+  await indexesReady;
+  const jobs = await HealthJob.find({ tenantId, ownerUserId, installationId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select('status attempt nextAttemptAt lastErrorCode createdAt updatedAt')
+    .lean()
+    .exec();
+  return jobs.map((job) => ({
+    id: job._id.toString(),
+    status: job.status,
+    attempt: job.attempt,
+    nextAttemptAt: job.nextAttemptAt,
+    lastErrorCode: job.lastErrorCode || null,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+  }));
+}
+
 async function claimJob() {
   const now = new Date();
   const token = randomUUID();
@@ -202,6 +230,7 @@ function stopConnectorHealthJobWorker() {
 
 module.exports = {
   enqueueOwnerHealthCheck,
+  listOwnerHealthJobs,
   startConnectorHealthJobWorker,
   stopConnectorHealthJobWorker,
 };
