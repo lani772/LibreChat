@@ -161,7 +161,7 @@ async function retryOwnerDeadHealthJob({ installationId, jobId }) {
   if (!tenantId || !ownerUserId || tenantId === '__SYSTEM__') {
     throw new Error('Health job recovery requires an authenticated tenant owner context');
   }
-  if (!/^[a-f\\d]{24}$/i.test(installationId) || !/^[a-f\\d]{24}$/i.test(jobId)) {
+  if (!/^[a-f\d]{24}$/i.test(installationId) || !/^[a-f\d]{24}$/i.test(jobId)) {
     throw new Error('Invalid connector health job recovery target');
   }
   await indexesReady;
