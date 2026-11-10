@@ -33,13 +33,13 @@ export type ConnectorHealthResult = {
 
 export type ConnectorHealthProbe = (installationId: string) => Promise<void>;
 
-function safeHealthError(error: unknown, provider: string): string {
+function safeHealthError(error: unknown, _provider: string): string {
   const code = error && typeof error === 'object' && 'code' in error
     ? (error as { code?: unknown }).code
     : undefined;
-  if (code === 'INSUFFICIENT_SCOPE') return `${provider}_insufficient_scope`;
-  if (code === 'PROVIDER_UNAVAILABLE') return `${provider}_provider_unavailable`;
-  if (code === 'INVALID_RESPONSE') return `${provider}_invalid_response`;
+  if (code === 'INSUFFICIENT_SCOPE') return 'provider_insufficient_scope';
+  if (code === 'PROVIDER_UNAVAILABLE') return 'provider_unavailable';
+  if (code === 'INVALID_RESPONSE') return 'provider_invalid_response';
   return 'connector_health_check_failed';
 }
 
