@@ -178,6 +178,36 @@ export default function GoogleWorkspaceConnections() {
     }
   };
 
+  const checkHealth = async (installationId: string) => {
+    setBusyId(installationId);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `/api/connectors/google-workspace/${encodeURIComponent(installationId)}/health-check`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        },
+      );
+      const result = await readJson<{
+        healthy: boolean;
+        state: string;
+        consecutiveFailures: number;
+        errorCode: string | null;
+      }>(response);
+      setMessage(result.healthy
+        ? 'Google Workspace connection check succeeded.'
+        : `Google Workspace is temporarily unhealthy (${result.errorCode ?? 'provider_error'}). Consecutive failures: ${result.consecutiveFailures}.`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to check Google Workspace connection.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const disconnect = async (installationId: string) => {
     setBusyId(installationId);
     setError(null);
