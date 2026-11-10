@@ -287,3 +287,12 @@ Focused tests cover trusted owner-context capture, rejection of system/missing i
 ### Health-job audit delivery
 
 Health-job lifecycle events use the existing append-only, hash-chained tenant audit log. The job document carries an embedded audit outbox; scheduling, retry scheduling and dead-letter transitions append an event to that outbox atomically with the job write. The worker drains pending outbox entries on normal processing and on later polling ticks, so an audit-store outage does not erase the event. Audit delivery is at-least-once: a process crash after the audit append but before outbox acknowledgement can produce a duplicate, correlated by the stable event ID in metadata. No credential material, access tokens, lease tokens or message content is recorded. Tenant administrators can see the allowlisted lifecycle event fields through the existing connector audit endpoint.
+
+
+### Lease recovery and owner dead-job replay
+
+Expired processing leases are reclaimed with a single MongoDB findOneAndUpdate aggregation-pipeline operation. The same atomic write replaces the lease token, increments the fencing counter, and appends a connector.health_job_lease_recovered outbox event containing the recovery timestamp and prior fence value. The worker drains that event before beginning the newly claimed probe. A previous worker's later completion remains fenced by its old token and counter.
+
+Owners can inspect the bounded job projection at GET /api/connectors/google-workspace/:installationId/health-jobs. A dead job can be replayed through POST /api/connectors/google-workspace/:installationId/health-jobs/:jobId/retry. Both the installation and dead job are scoped to the authenticated tenant and owner; request-supplied tenant/owner IDs are ignored. Replay is accepted only while the installation is connected or degraded, resets the attempt counter, atomically restores the active-job key, and records an audit-outbox event. A conflicting active job returns HTTP 409. Reauthorization-required installations must be reconnected before replay; the status projection exposes a reauthorizationRequired boolean for that terminal error code.
+
+Unit tests cover the atomic expired-lease update shape, audit event creation, and owner-bound replay filters. These tests are authored but have not been executed. Real multi-process contention, process-kill recovery, and end-to-end tenant isolation still require execution against a dependency-enabled MongoDB test environment.
