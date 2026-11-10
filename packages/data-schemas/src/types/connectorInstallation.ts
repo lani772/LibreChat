@@ -34,6 +34,9 @@ export interface ConnectorInstallationDocument {
   grantedPrincipalIds: string[];
   lastConnectedAt?: Date;
   lastErrorCode?: string;
+  consecutiveHealthFailures: number;
+  lastHealthCheckAt?: Date;
+  lastSuccessfulHealthCheckAt?: Date;
   version: number;
   createdAt: Date;
   updatedAt: Date;
