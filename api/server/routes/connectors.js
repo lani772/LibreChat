@@ -54,6 +54,7 @@ router.get('/google-workspace', loginLimiter, requireJwtAuth, async (req, res) =
         state: installation.state,
         lastConnectedAt: installation.lastConnectedAt || null,
         lastErrorCode: installation.lastErrorCode || null,
+        grantedPrincipalIds: installation.grantedPrincipalIds || [],
         version: installation.version,
       })),
     });
