@@ -13,6 +13,10 @@ on:
       - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.spec.tsx'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
+      - 'packages/data-schemas/src/schema/connectorRevocation.ts'
+      - 'packages/data-schemas/src/schema/connectorInstallation.ts'
+      - 'packages/data-schemas/src/schema/connectorCredential.ts'
+      - 'packages/data-schemas/src/schema/googleOAuthState.ts'
       - '.github/workflows/connector-health-worker.yml'
   pull_request:
     branches:
@@ -26,6 +30,10 @@ on:
       - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.spec.tsx'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
+      - 'packages/data-schemas/src/schema/connectorRevocation.ts'
+      - 'packages/data-schemas/src/schema/connectorInstallation.ts'
+      - 'packages/data-schemas/src/schema/connectorCredential.ts'
+      - 'packages/data-schemas/src/schema/googleOAuthState.ts'
       - '.github/workflows/connector-health-worker.yml'
   workflow_dispatch:
 
