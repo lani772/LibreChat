@@ -2,6 +2,7 @@ const mockModel = {
   createIndexes: jest.fn().mockResolvedValue(undefined),
   findOneAndUpdate: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
   findOne: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
+  find: jest.fn(() => ({ sort: () => ({ limit: () => ({ select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue([{ _id: 'job-1', status: 'dead', attempt: 5, lastErrorCode: 'google_reauthorization_required' }]) }) }) }) }) })),
 };
 let mockTenantId = 'tenant-a';
 let mockUserId = 'owner-a';
@@ -31,7 +32,7 @@ jest.mock('@librechat/api', () => ({
   },
 }));
 
-const { enqueueOwnerHealthCheck } = require('./ConnectorHealthJobWorker');
+const { enqueueOwnerHealthCheck, listOwnerHealthJobs } = require('./ConnectorHealthJobWorker');
 
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
@@ -79,5 +80,43 @@ describe('ConnectorHealthJobWorker enqueue boundary', () => {
       provider: 'other-provider',
     })).rejects.toThrow();
     expect(mockModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectorHealthJobWorker owner visibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
+  });
+
+  it('returns only the safe operational projection for the trusted owner', async () => {
+    const jobs = await listOwnerHealthJobs({
+      installationId: '507f1f77bcf86cd799439011',
+      limit: 10,
+    });
+    expect(mockModel.find).toHaveBeenCalledWith({
+      tenantId: 'tenant-a',
+      ownerUserId: 'owner-a',
+      installationId: '507f1f77bcf86cd799439011',
+    });
+    expect(jobs[0]).toMatchObject({
+      status: 'dead',
+      attempt: 5,
+      lastErrorCode: 'google_reauthorization_required',
+    });
+    expect(jobs[0]).not.toHaveProperty('tenantId');
+    expect(jobs[0]).not.toHaveProperty('ownerUserId');
+    expect(jobs[0]).not.toHaveProperty('leaseToken');
+  });
+
+  it('rejects system identity and unbounded limits', async () => {
+    mockTenantId = '__SYSTEM__';
+    await expect(listOwnerHealthJobs({ installationId: '507f1f77bcf86cd799439011' }))
+      .rejects.toThrow('authenticated tenant owner context');
+    mockTenantId = 'tenant-a';
+    await expect(listOwnerHealthJobs({ installationId: '507f1f77bcf86cd799439011', limit: 1000 }))
+      .rejects.toThrow('Invalid connector health job query');
+    expect(mockModel.find).not.toHaveBeenCalled();
   });
 });
