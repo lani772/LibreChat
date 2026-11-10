@@ -1309,6 +1309,11 @@ export const AUDIT_ACTIONS = [
   'mcp_server.deleted',
   /** Connector-backed MCP tool invocation; outcomes distinguish allowed and denied attempts. */
   'mcp.tool_invoked',
+  /** Durable connector health-job scheduling, retry, lease recovery and dead-letter events. */
+  'connector.health_job_scheduled',
+  'connector.health_job_retry_scheduled',
+  'connector.health_job_lease_recovered',
+  'connector.health_job_dead_lettered',
   'code_worker.paired',
   'code_worker.revoked',
   'langfuse.updated',
@@ -1355,6 +1360,10 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'mcp_server.updated': 'mcp',
   'mcp_server.deleted': 'mcp',
   'mcp.tool_invoked': 'mcp',
+  'connector.health_job_scheduled': 'mcp',
+  'connector.health_job_retry_scheduled': 'mcp',
+  'connector.health_job_lease_recovered': 'mcp',
+  'connector.health_job_dead_lettered': 'mcp',
   'code_worker.paired': 'credential',
   'code_worker.revoked': 'credential',
   'langfuse.updated': 'config',
