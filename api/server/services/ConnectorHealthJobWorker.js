@@ -148,6 +148,7 @@ async function listOwnerHealthJobs({ installationId, limit = 10 }) {
     attempt: job.attempt,
     nextAttemptAt: job.nextAttemptAt,
     lastErrorCode: job.lastErrorCode || null,
+    reauthorizationRequired: job.lastErrorCode === 'google_reauthorization_required',
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   }));
