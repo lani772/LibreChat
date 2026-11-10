@@ -540,4 +540,18 @@ describe('Google Workspace connector routes', () => {
   });
 
 
+  it('denies health checks for a principal who does not own the connector', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'another-user',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    const response = await request(app)
+      .post('/api/connectors/google-workspace/507f1f77bcf86cd799439011/health-check');
+    expect(response.status).toBe(404);
+    expect(getConnectorHealthMonitor).not.toHaveBeenCalled();
+  });
+
+
 });
