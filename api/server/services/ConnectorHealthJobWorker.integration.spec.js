@@ -158,6 +158,44 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
     expect(await HealthJob.countDocuments({})).toBe(3);
   });
 
+  it('prevents a stale worker from committing a probe result after a successor claims the job', async () => {
+    const storedJob = await createPendingJob({
+      status: 'processing',
+      leaseToken: 'replica-one-token',
+      leaseUntil: new Date(Date.now() + 60_000),
+      fence: 2,
+    });
+    const job = storedJob.toObject();
+    const monitor = {
+      checkInstallation: jest.fn(async () => {
+        await ReplicaHealthJob.updateOne(
+          { _id: job._id, status: 'processing', leaseToken: 'replica-one-token', fence: 2 },
+          {
+            $set: { leaseToken: 'replica-two-token', leaseUntil: new Date(Date.now() + 60_000) },
+            $inc: { fence: 1 },
+          },
+        );
+        return { status: 'healthy' };
+      }),
+    };
+    const db = {
+      getConnectorInstallation: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-a',
+        ownerUserId: 'owner-a',
+        provider: 'google-workspace',
+        state: 'connected',
+      }),
+    };
+
+    await worker.processClaim(job, monitor, db);
+
+    const persisted = await HealthJob.findById(job._id).lean();
+    expect(monitor.checkInstallation).toHaveBeenCalledTimes(1);
+    expect(persisted.status).toBe('processing');
+    expect(persisted.leaseToken).toBe('replica-two-token');
+    expect(persisted.fence).toBe(3);
+  });
+
   it('rejects an installation owned by a different user in the same tenant', async () => {
     const storedJob = await createPendingJob({
       status: 'processing',
