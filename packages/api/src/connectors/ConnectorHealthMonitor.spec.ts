@@ -21,7 +21,7 @@ describe('ConnectorHealthMonitor', () => {
     });
     const store = {
       getConnectorInstallation: jest.fn().mockResolvedValue(installation()),
-      listConnectorInstallations: jest.fn().mockResolvedValue([]),
+      listConnectorHealthCandidates: jest.fn().mockResolvedValue([]),
       recordConnectorHealth,
     };
     const probe = jest.fn().mockResolvedValue(undefined);
@@ -44,7 +44,7 @@ describe('ConnectorHealthMonitor', () => {
     });
     const store = {
       getConnectorInstallation: jest.fn().mockResolvedValue(installation()),
-      listConnectorInstallations: jest.fn().mockResolvedValue([]),
+      listConnectorHealthCandidates: jest.fn().mockResolvedValue([]),
       recordConnectorHealth,
     };
     const monitor = new ConnectorHealthMonitor(store, {
