@@ -206,21 +206,31 @@ router.get(
         return res.status(404).json({ error: 'Connector installation is unavailable' });
       }
 
-      const members = await db.searchUsers({
-        searchPattern: query,
-        limit: 20,
-        fieldsToSelect: '_id name username email',
-      });
-      return res.status(200).json({
-        members: members
-          .filter((member) => member._id.toString() !== principalId)
-          .map((member) => ({
-            id: member._id.toString(),
+      const [searchMatches, grantedMembers] = await Promise.all([
+        db.searchUsers({
+          searchPattern: query,
+          limit: 20,
+          fieldsToSelect: '_id name username email',
+        }),
+        db.findUsers(
+          { _id: { $in: installation.grantedPrincipalIds || [] } },
+          '_id name username email',
+          { limit: 100 },
+        ),
+      ]);
+      const visibleMembers = new Map();
+      for (const member of [...grantedMembers, ...searchMatches]) {
+        const memberId = member._id.toString();
+        if (memberId !== principalId) {
+          visibleMembers.set(memberId, {
+            id: memberId,
             name: member.name || null,
             username: member.username || null,
             email: member.email,
-          })),
-      });
+          });
+        }
+      }
+      return res.status(200).json({ members: [...visibleMembers.values()] });
     } catch {
       return res.status(503).json({ error: 'Tenant member search is temporarily unavailable' });
     }
