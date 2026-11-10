@@ -90,6 +90,22 @@ describe('GoogleWorkspaceOAuthFlow', () => {
     );
   });
 
+  it('keeps a committed OAuth connection successful when first health-job scheduling fails', async () => {
+    const { flow, onConnected, installations, vault } = setup();
+    onConnected.mockRejectedValue(new Error('health queue unavailable'));
+    const started = await flow.begin({ identity, installationId: '507f1f77bcf86cd799439011' });
+    const state = new URL(started.authorizationUrl).searchParams.get('state')!;
+    await expect(flow.complete({ state, code: 'auth-code' })).resolves.toEqual({
+      installationId: '507f1f77bcf86cd799439011',
+      connected: true,
+    });
+    expect(vault.storeCredentials).toHaveBeenCalled();
+    expect(installations.transitionConnectorInstallation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: 'connected' }),
+    );
+    expect(onConnected).toHaveBeenCalledWith({ installationId: '507f1f77bcf86cd799439011' });
+  });
+
   it('rejects replayed state', async () => {
     const { flow } = setup();
     const started = await flow.begin({ identity, installationId: '507f1f77bcf86cd799439011' });
