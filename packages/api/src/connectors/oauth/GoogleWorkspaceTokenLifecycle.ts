@@ -156,9 +156,9 @@ export class GoogleWorkspaceTokenLifecycle {
    */
   async disconnect(installationId: string): Promise<{
     disconnected: boolean;
-    remoteRevocation: 'confirmed' | 'pending' | 'not_attempted';
+    remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' | 'retry_unavailable';
   }> {
-    let remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' = 'not_attempted';
+    let remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' | 'retry_unavailable' = 'not_attempted';
     try {
       await this.deps.vault.withCredentials(installationId, async (credentials, snapshot) => {
         const token =
@@ -182,7 +182,7 @@ export class GoogleWorkspaceTokenLifecycle {
             await this.deps.adapter.revokeToken({ token });
             remoteRevocation = 'confirmed';
           } catch {
-            remoteRevocation = 'pending';
+            remoteRevocation = 'retry_unavailable';
           }
         }
       });
