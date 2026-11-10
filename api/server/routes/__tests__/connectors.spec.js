@@ -18,6 +18,7 @@ jest.mock('~/models', () => ({
   listConnectorInstallations: jest.fn(),
   createConnectorInstallation: jest.fn(),
   findUsers: jest.fn(),
+  searchUsers: jest.fn(),
   updateConnectorInstallationGrants: jest.fn(),
 }));
 
@@ -246,6 +247,76 @@ describe('Google Workspace connector routes', () => {
       .send({ expectedVersion: 4, principalIds: ['507f191e810c19729de860ea'] });
 
     expect(response.status).toBe(409);
+  });
+
+  it('searches tenant members for the owner and returns only safe directory fields', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+    db.searchUsers.mockResolvedValue([
+      {
+        _id: { toString: () => '507f191e810c19729de860eb' },
+        name: 'Member B',
+        username: 'memberb',
+        email: 'memberb@example.test',
+        password: 'must-not-leak',
+        refreshToken: ['must-not-leak'],
+      },
+      {
+        _id: { toString: () => 'user-a' },
+        name: 'Owner',
+        username: 'owner',
+        email: 'owner@example.test',
+      },
+    ]);
+
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/members')
+      .query({ q: 'member' });
+
+    expect(response.status).toBe(200);
+    expect(db.searchUsers).toHaveBeenCalledWith({
+      searchPattern: 'member',
+      limit: 20,
+      fieldsToSelect: '_id name username email',
+    });
+    expect(response.body.members).toEqual([{
+      id: '507f191e810c19729de860eb',
+      name: 'Member B',
+      username: 'memberb',
+      email: 'memberb@example.test',
+    }]);
+    expect(JSON.stringify(response.body)).not.toContain('must-not-leak');
+  });
+
+  it('does not search members for an installation the caller does not own', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-b',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/members')
+      .query({ q: 'member' });
+
+    expect(response.status).toBe(404);
+    expect(db.searchUsers).not.toHaveBeenCalled();
+  });
+
+  it('rejects short member search terms without querying the database', async () => {
+    const response = await request(app)
+      .get('/api/connectors/google-workspace/507f1f77bcf86cd799439011/members')
+      .query({ q: 'a' });
+
+    expect(response.status).toBe(400);
+    expect(db.getConnectorInstallation).not.toHaveBeenCalled();
+    expect(db.searchUsers).not.toHaveBeenCalled();
   });
 
   it('returns only safe status fields to the installation owner', async () => {
