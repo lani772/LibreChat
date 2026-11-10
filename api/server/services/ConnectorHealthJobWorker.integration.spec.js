@@ -1,0 +1,138 @@
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+
+jest.mock('@librechat/data-schemas', () => ({
+  logger: { error: jest.fn() },
+  tenantStorage: {
+    run: (_identity, operation) => operation(),
+  },
+  getTenantId: () => 'tenant-a',
+  getUserId: () => 'owner-a',
+  runAsSystem: (operation) => operation(),
+}));
+
+describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
+  let mongo;
+  let worker;
+  let HealthJob;
+
+  beforeAll(async () => {
+    mongo = await MongoMemoryServer.create();
+    await mongoose.connect(mongo.getUri(), { dbName: 'connector-health-worker-test' });
+    // Load after connecting so the worker's index initialization targets this database.
+    worker = require('./ConnectorHealthJobWorker');
+    HealthJob = mongoose.models.ConnectorHealthJob;
+    await HealthJob.init();
+  }, 120_000);
+
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongo?.stop();
+  });
+
+  beforeEach(async () => {
+    await HealthJob.deleteMany({});
+  });
+
+  const createPendingJob = (overrides = {}) => HealthJob.create({
+    tenantId: 'tenant-a',
+    ownerUserId: 'owner-a',
+    installationId: '507f1f77bcf86cd799439011',
+    provider: 'google-workspace',
+    status: 'pending',
+    attempt: 0,
+    nextAttemptAt: new Date(Date.now() - 1_000),
+    fence: 0,
+    activeKey: 'tenant-a:owner-a:507f1f77bcf86cd799439011',
+    ...overrides,
+  });
+
+  it('allows only one replica to claim a due job', async () => {
+    await createPendingJob();
+
+    const claims = await Promise.all([worker.claimJob(), worker.claimJob()]);
+    const winners = claims.filter(Boolean);
+
+    expect(winners).toHaveLength(1);
+    expect(winners[0].status).toBe('processing');
+    expect(winners[0].fence).toBe(1);
+
+    const persisted = await HealthJob.findById(winners[0]._id).lean();
+    expect(persisted.status).toBe('processing');
+    expect(persisted.leaseToken).toBe(winners[0].leaseToken);
+  });
+
+  it('reclaims an expired lease once, increments its fence and rejects stale renewal', async () => {
+    const original = await createPendingJob({
+      status: 'processing',
+      leaseToken: 'replica-one-token',
+      leaseUntil: new Date(Date.now() - 5_000),
+      fence: 4,
+    });
+
+    const claims = await Promise.all([worker.claimJob(), worker.claimJob()]);
+    const winners = claims.filter(Boolean);
+    expect(winners).toHaveLength(1);
+    expect(winners[0].fence).toBe(5);
+    expect(winners[0].leaseToken).not.toBe('replica-one-token');
+    expect(winners[0].auditOutbox).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: 'connector.health_job_lease_recovered',
+        metadata: expect.objectContaining({
+          recovery: 'expired_lease',
+          previousFence: '4',
+        }),
+      }),
+    ]));
+
+    await expect(worker.renewClaim({
+      _id: original._id,
+      leaseToken: 'replica-one-token',
+      fence: 4,
+    })).resolves.toBe(false);
+  });
+
+  it('keeps active-job uniqueness partitioned by tenant and owner', async () => {
+    await createPendingJob();
+    await expect(createPendingJob()).rejects.toMatchObject({ code: 11000 });
+
+    await expect(createPendingJob({
+      tenantId: 'tenant-b',
+      activeKey: 'tenant-b:owner-a:507f1f77bcf86cd799439011',
+    })).resolves.toBeDefined();
+    await expect(createPendingJob({
+      tenantId: 'tenant-a',
+      ownerUserId: 'owner-b',
+      activeKey: 'tenant-a:owner-b:507f1f77bcf86cd799439011',
+    })).resolves.toBeDefined();
+    expect(await HealthJob.countDocuments({})).toBe(3);
+  });
+
+  it('does not probe an installation whose persisted owner or tenant differs from the job', async () => {
+    const storedJob = await createPendingJob({
+      status: 'processing',
+      leaseToken: 'current-token',
+      leaseUntil: new Date(Date.now() + 60_000),
+      fence: 2,
+    });
+    const job = storedJob.toObject();
+    const monitor = { checkInstallation: jest.fn() };
+    const db = {
+      getConnectorInstallation: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-b',
+        ownerUserId: 'owner-a',
+        provider: 'google-workspace',
+        state: 'connected',
+      }),
+    };
+
+    await worker.processClaim(job, monitor, db);
+
+    expect(db.getConnectorInstallation).toHaveBeenCalledWith(job.installationId);
+    expect(monitor.checkInstallation).not.toHaveBeenCalled();
+    const persisted = await HealthJob.findById(job._id).lean();
+    expect(persisted.status).toBe('completed');
+    expect(persisted.lastErrorCode).toBe('installation_not_eligible');
+    expect(persisted.activeKey).toBeUndefined();
+  });
+});
