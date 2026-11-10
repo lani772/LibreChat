@@ -227,7 +227,7 @@ successful probe time, consecutive failure count, and a bounded safe error code.
 response body, token, credential reference, or user file content is retained in health metadata.
 
 `ConnectorHealthMonitor` runs registered provider probes inside a trusted tenant/principal
-context. It processes a bounded batch of at most 25 connected/degraded installations, isolates
+context. It processes a bounded batch of at most 25 connected/degraded installations, ordered by oldest health observation (never checked first), isolates
 probe failures per installation, and records each result with optimistic version checking.
 Three consecutive failures mark a connected installation as `degraded` by default; a successful
 probe resets the failure counter and recovers a degraded installation to `connected`.
