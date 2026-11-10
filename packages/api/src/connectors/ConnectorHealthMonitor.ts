@@ -3,6 +3,7 @@ export interface ConnectorHealthRecord {
   provider: string;
   state: 'disconnected' | 'authorizing' | 'connected' | 'degraded' | 'revoked' | 'error';
   version: number;
+  healthVersion: number;
   consecutiveHealthFailures?: number;
   lastErrorCode?: string;
 }
@@ -15,7 +16,7 @@ export interface ConnectorHealthStore {
   }): Promise<ConnectorHealthRecord[]>;
   recordConnectorHealth(input: {
     installationId: string;
-    expectedVersion: number;
+    expectedHealthVersion: number;
     outcome: 'healthy' | 'unhealthy';
     errorCode?: string;
     failureThreshold: number;
@@ -99,7 +100,7 @@ export class ConnectorHealthMonitor {
 
     const updated = await this.store.recordConnectorHealth({
       installationId,
-      expectedVersion: installation.version,
+      expectedHealthVersion: installation.healthVersion,
       outcome,
       ...(errorCode ? { errorCode } : {}),
       failureThreshold: this.options.failureThreshold ?? 3,
@@ -132,16 +133,22 @@ export class ConnectorHealthMonitor {
     if (!Number.isInteger(limit) || limit < 1 || limit > 25) {
       throw new Error('Connector health batch size must be between 1 and 25');
     }
-    const candidates = await this.store.listConnectorInstallations({
+    const connected = await this.store.listConnectorInstallations({
       limit,
       state: 'connected',
     });
     const degraded = await this.store.listConnectorInstallations({
-      limit: Math.max(1, limit - candidates.length),
+      limit,
       state: 'degraded',
     });
+    // Interleave states so a large connected population cannot starve degraded recovery.
+    const candidates: ConnectorHealthRecord[] = [];
+    for (let index = 0; candidates.length < limit && (index < connected.length || index < degraded.length); index += 1) {
+      if (index < degraded.length) candidates.push(degraded[index]);
+      if (candidates.length < limit && index < connected.length) candidates.push(connected[index]);
+    }
     const results: ConnectorHealthResult[] = [];
-    for (const installation of [...candidates, ...degraded].slice(0, limit)) {
+    for (const installation of candidates) {
       results.push(await this.checkInstallation(installation._id.toString()));
     }
     return {
