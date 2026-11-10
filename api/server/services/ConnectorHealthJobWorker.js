@@ -284,6 +284,9 @@ async function withClaimLease(job, operation) {
     return leaseLost ? { leaseLost: true } : { leaseLost: false, result };
   } finally {
     clearInterval(heartbeat);
+    // Also drain an in-flight renewal when the provider probe throws, so the
+    // caller's retry/dead-letter transition cannot race a background heartbeat.
+    await renewalPromise;
   }
 }
 
