@@ -119,7 +119,7 @@ router.put(
       expectedVersion < 0 ||
       !Array.isArray(principalIds) ||
       principalIds.length > 100 ||
-      principalIds.some((id) => typeof id !== 'string' || !/^[a-f\\d]{24}$/i.test(id.trim()))
+      principalIds.some((id) => typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id.trim()))
     ) {
       return res.status(400).json({ error: 'Invalid connector grant request' });
     }
