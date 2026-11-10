@@ -338,7 +338,7 @@ router.post(
     const tenantId = getTenantId();
     const principalId = getUserId();
     const { installationId } = req.params;
-    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+    if (!tenantId || !principalId || !/^[a-f\d]{24}$/i.test(installationId)) {
       return res.status(404).json({ error: 'Connector installation is unavailable' });
     }
     try {
