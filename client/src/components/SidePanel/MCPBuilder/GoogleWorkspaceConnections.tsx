@@ -18,7 +18,9 @@ async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new Error(response.status === 403
       ? 'You do not have permission to manage this connection.'
-      : 'Google Workspace could not complete the request. Please try again.');
+      : response.status === 409
+        ? 'Sharing changed elsewhere. Refresh the connection list and try again.'
+        : 'Google Workspace could not complete the request. Please try again.');
   }
   return response.json() as Promise<T>;
 }
