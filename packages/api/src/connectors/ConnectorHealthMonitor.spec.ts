@@ -66,7 +66,7 @@ describe('ConnectorHealthMonitor', () => {
     const store = {
       getConnectorInstallation: jest.fn().mockResolvedValueOnce(installation({ state: 'disconnected' }))
         .mockResolvedValueOnce(installation()),
-      listConnectorInstallations: jest.fn().mockResolvedValue([]),
+      listConnectorHealthCandidates: jest.fn().mockResolvedValue([]),
       recordConnectorHealth: jest.fn().mockResolvedValue(null),
     };
     const monitor = new ConnectorHealthMonitor(store, { 'google-workspace': jest.fn() });
