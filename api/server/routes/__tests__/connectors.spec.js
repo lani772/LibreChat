@@ -64,6 +64,9 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
       state: 'connected',
       version: 2,
+      lastHealthCheckAt: new Date('2026-11-09T10:00:00.000Z'),
+      lastSuccessfulHealthCheckAt: new Date('2026-11-09T09:55:00.000Z'),
+      consecutiveHealthFailures: 1,
       credentialRef: 'must-not-leak',
     }]);
     const response = await request(app).get('/api/connectors/google-workspace');
@@ -72,6 +75,11 @@ describe('Google Workspace connector routes', () => {
       ownerUserId: 'user-a',
       provider: 'google-workspace',
       limit: 50,
+    });
+    expect(response.body.installations[0]).toMatchObject({
+      lastHealthCheckAt: '2026-11-09T10:00:00.000Z',
+      lastSuccessfulHealthCheckAt: '2026-11-09T09:55:00.000Z',
+      consecutiveHealthFailures: 1,
     });
     expect(response.body.installations[0]).not.toHaveProperty('credentialRef');
   });
