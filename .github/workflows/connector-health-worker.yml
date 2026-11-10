@@ -8,7 +8,7 @@ on:
       - 'api/server/services/ConnectorHealthJobWorker.js'
       - 'api/server/services/ConnectorHealthJobWorker*.spec.js'
       - 'api/server/routes/connectors.js'
-      - 'server/routes/__tests__/connectors.spec.js'
+      - 'api/server/routes/__tests__/connectors.spec.js'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
       - '.github/workflows/connector-health-worker.yml'
@@ -50,9 +50,15 @@ jobs:
       - name: Install workspace dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Build workspace packages required by backend imports
+        run: |
+          npm run build:data-provider
+          npm run build:data-schemas
+          npm run build:api
+
       - name: Run worker unit, MongoDB concurrency, and connector route tests
         run: >-
           npm run test --workspace api -- --runInBand
           server/services/ConnectorHealthJobWorker.spec.js
           server/services/ConnectorHealthJobWorker.integration.spec.js
-          api/server/routes/__tests__/connectors.spec.js
+          server/routes/__tests__/connectors.spec.js
