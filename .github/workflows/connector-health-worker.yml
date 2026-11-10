@@ -81,7 +81,7 @@ jobs:
 
       - name: Run retry-policy tests
         run: >-
-          npm run test:ci --workspace @librechat/api -- --runInBand
+          npm run test:ci --workspace @librechat/api -- --runInBand --coverage=false
           src/connectors/ConnectorHealthRetryPolicy.spec.ts
 
       - name: Run Google Workspace connection UI tests
