@@ -13,6 +13,9 @@ interface ConnectorInstallation {
   grantedPrincipalCount: number;
   mcpServerId: string | null;
   lastConnectedAt: string | null;
+  lastHealthCheckAt: string | null;
+  lastSuccessfulHealthCheckAt: string | null;
+  consecutiveHealthFailures: number;
   lastErrorCode: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -161,6 +164,9 @@ export default function ConnectorGovernance() {
                   <div><dt className="inline text-text-secondary">Shared with: </dt><dd className="inline">{item.grantedPrincipalCount} member(s)</dd></div>
                   <div><dt className="inline text-text-secondary">Last connected: </dt><dd className="inline">{formatDate(item.lastConnectedAt)}</dd></div>
                   <div><dt className="inline text-text-secondary">Updated: </dt><dd className="inline">{formatDate(item.updatedAt)}</dd></div>
+                  <div><dt className="inline text-text-secondary">Last health check: </dt><dd className="inline">{formatDate(item.lastHealthCheckAt)}</dd></div>
+                  <div><dt className="inline text-text-secondary">Last successful check: </dt><dd className="inline">{formatDate(item.lastSuccessfulHealthCheckAt)}</dd></div>
+                  <div><dt className="inline text-text-secondary">Consecutive health failures: </dt><dd className="inline">{item.consecutiveHealthFailures}</dd></div>
                 </dl>
                 {item.lastErrorCode && <p className="mt-2 text-xs text-amber-600">Last error: {item.lastErrorCode}</p>}
               </article>
