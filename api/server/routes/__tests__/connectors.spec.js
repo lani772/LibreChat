@@ -2,6 +2,7 @@ const express = require('express');
 const request = require('supertest');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
 const db = require('~/models');
+const { retryOwnerDeadHealthJob } = require('~/server/services/ConnectorHealthJobWorker');
 const {
   getGoogleWorkspaceOAuthFlow,
   getGoogleWorkspaceTokenLifecycle,
@@ -27,6 +28,12 @@ jest.mock('~/server/middleware', () => ({
   requireJwtAuth: (req, _res, next) => next(),
   requireSameOrigin: (_req, _res, next) => next(),
   loginLimiter: (_req, _res, next) => next(),
+}));
+
+jest.mock('~/server/services/ConnectorHealthJobWorker', () => ({
+  enqueueOwnerHealthCheck: jest.fn().mockResolvedValue({}),
+  listOwnerHealthJobs: jest.fn().mockResolvedValue([]),
+  retryOwnerDeadHealthJob: jest.fn().mockResolvedValue({ id: '507f1f77bcf86cd799439012', status: 'pending' }),
 }));
 
 jest.mock('~/server/services/initializeMCPs', () => ({
@@ -517,6 +524,35 @@ describe('Google Workspace connector routes', () => {
     expect(response.headers.location).toContain('googleWorkspace=failed');
     expect(response.headers.location).not.toContain('sensitive');
     expect(flow.cancel).toHaveBeenCalledWith({ state: 'opaque-state' });
+  });
+
+  it('allows the connector owner to replay a dead health job', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    const response = await request(app)
+      .post('/api/connectors/google-workspace/507f1f77bcf86cd799439011/health-jobs/507f1f77bcf86cd799439012/retry');
+    expect(response.status).toBe(202);
+    expect(retryOwnerDeadHealthJob).toHaveBeenCalledWith({
+      installationId: '507f1f77bcf86cd799439011',
+      jobId: '507f1f77bcf86cd799439012',
+    });
+  });
+
+  it('does not allow a non-owner to replay a health job', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'another-user',
+      provider: 'google-workspace',
+      state: 'connected',
+    });
+    const response = await request(app)
+      .post('/api/connectors/google-workspace/507f1f77bcf86cd799439011/health-jobs/507f1f77bcf86cd799439012/retry');
+    expect(response.status).toBe(404);
+    expect(retryOwnerDeadHealthJob).not.toHaveBeenCalled();
   });
 
   it('runs an owner-authorized health probe and returns only safe health metadata', async () => {
