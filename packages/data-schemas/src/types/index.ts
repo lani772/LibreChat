@@ -59,3 +59,4 @@ export * from './mcpAuthority';
 export * from './connectorInstallation';
 export * from './connectorCredential';
 export * from './googleOAuthState';
+export * from './connectorRevocation';
