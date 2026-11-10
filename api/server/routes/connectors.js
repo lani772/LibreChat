@@ -187,10 +187,10 @@ router.get(
     const principalId = getUserId();
     const { installationId } = req.params;
     const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+    if (!tenantId || !principalId || !/^[a-f\d]{24}$/i.test(installationId)) {
       return res.status(404).json({ error: 'Connector installation is unavailable' });
     }
-    if (query.length < 2 || query.length > 64 || /[\\u0000-\\u001f\\u007f]/.test(query)) {
+    if (query.length < 2 || query.length > 64 || /[\u0000-\u001f\u007f]/.test(query)) {
       return res.status(400).json({ error: 'Enter between 2 and 64 characters to search members' });
     }
     try {
