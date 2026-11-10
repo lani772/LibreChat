@@ -11,3 +11,4 @@ export * from './oauth/stateCrypto';
 export * from './oauth/GoogleWorkspaceTokenLifecycle';
 export * from './oauth/GoogleDriveReadOnlyConnector';
 export * from './ConnectorCredentialRotation';
+export * from './credentialRotationCli';
