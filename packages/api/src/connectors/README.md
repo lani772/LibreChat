@@ -218,3 +218,32 @@ cancellation of already-running requests is made.
 Regression coverage exercises changing membership and grant state between consecutive
 authorization checks, plus fresh role reads for permission revocation. These tests are authored
 but must be run in the repository's configured test environment before release.
+
+
+## Connector health monitoring and recovery
+
+Connector installations persist only operational health metadata: the last probe time, last
+successful probe time, consecutive failure count, and a bounded safe error code. No provider
+response body, token, credential reference, or user file content is retained in health metadata.
+
+`ConnectorHealthMonitor` runs registered provider probes inside a trusted tenant/principal
+context. It processes a bounded batch of at most 25 connected/degraded installations, isolates
+probe failures per installation, and records each result with optimistic version checking.
+Three consecutive failures mark a connected installation as `degraded` by default; a successful
+probe resets the failure counter and recovers a degraded installation to `connected`.
+Disconnected, authorizing, errored, and revoked installations are never revived by a health
+probe. Stale observations lose their compare-and-set update rather than overwriting a concurrent
+disconnect, reauthorization, or grant/state change.
+
+The Google Drive adapter exposes a minimal metadata-only health probe using the existing
+read-only files-list endpoint, the existing authorization boundary, granted OAuth scope check,
+and short provider timeout. The monitor itself does not schedule work: deployments should
+invoke bounded checks from their existing scheduler/worker under an authorized tenant context.
+Do not run tenant-owned probes from a global system identity or bypass ConnectorService.
+The tenant admin governance inventory displays only safe health timestamps, failure counts,
+and error codes. Health recovery changes only `connected/degraded` state and never reauthorizes
+credentials or restores revoked access.
+
+Focused tests cover success/failure recording, threshold-based degradation, recovery, stale
+version handling, revoked-state protection, safe error mapping, and batch bounds. They are
+authored but have not been executed in a dependency-enabled checkout.
