@@ -57,30 +57,33 @@ function healthJobAuditEvent(action, outcome, severity, metadata) {
  * log. Delivery is at-least-once across a crash between append and outbox ack.
  */
 async function flushHealthJobAuditOutbox(jobId, auditDb) {
-  const pending = await HealthJob.findOne({ _id: jobId, 'auditOutbox.0': { $exists: true } })
-    .select('tenantId ownerUserId installationId provider auditOutbox')
-    .lean()
-    .exec();
-  if (!pending) return;
-  const event = pending.auditOutbox[0];
-  await auditDb.recordAuditEntry({
-    action: event.action,
-    outcome: event.outcome,
-    severity: event.severity,
-    actor: { type: 'service', name: 'connector-health-worker' },
-    target: { type: 'connector', id: pending.installationId, name: 'Google Workspace' },
-    tenantId: pending.tenantId,
-    metadata: {
-      ...event.metadata,
-      provider: pending.provider,
-      eventId: event.eventId,
-      jobId: pending._id.toString(),
-    },
-  }, { failClosed: true });
-  await HealthJob.updateOne(
-    { _id: jobId, 'auditOutbox.eventId': event.eventId },
-    { $pull: { auditOutbox: { eventId: event.eventId } } },
-  ).exec();
+  /** Drain the durable outbox in order; failed writes leave the head event intact. */
+  for (;;) {
+    const pending = await HealthJob.findOne({ _id: jobId, 'auditOutbox.0': { $exists: true } })
+      .select('tenantId installationId provider auditOutbox')
+      .lean()
+      .exec();
+    if (!pending) return;
+    const event = pending.auditOutbox[0];
+    await auditDb.recordAuditEntry({
+      action: event.action,
+      outcome: event.outcome,
+      severity: event.severity,
+      actor: { type: 'service', name: 'connector-health-worker' },
+      target: { type: 'connector', id: pending.installationId, name: 'Google Workspace' },
+      tenantId: pending.tenantId,
+      metadata: {
+        ...event.metadata,
+        provider: pending.provider,
+        eventId: event.eventId,
+        jobId: pending._id.toString(),
+      },
+    }, { failClosed: true });
+    await HealthJob.updateOne(
+      { _id: jobId, 'auditOutbox.eventId': event.eventId },
+      { $pull: { auditOutbox: { eventId: event.eventId } } },
+    ).exec();
+  }
 }
 
 function trustedActiveKey(tenantId, ownerUserId, installationId) {
@@ -251,6 +254,11 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
     running = true;
     try {
       await indexesReady;
+      // Recover audit delivery after process restarts even when no job is currently due.
+      const outboxJobs = await HealthJob.find({ 'auditOutbox.0': { $exists: true } }).select('_id').limit(25).lean().exec();
+      for (const pending of outboxJobs) {
+        await flushHealthJobAuditOutbox(pending._id, database).catch(() => undefined);
+      }
       for (let count = 0; count < 10; count++) {
         const job = await runAsSystem(async () => claimJob());
         if (!job) break;
