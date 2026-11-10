@@ -247,3 +247,15 @@ credentials or restores revoked access.
 Focused tests cover success/failure recording, threshold-based degradation, recovery, stale
 version handling, revoked-state protection, safe error mapping, and batch bounds. They are
 authored but have not been executed in a dependency-enabled checkout.
+
+
+## Connector health visibility and owner recovery
+
+The owner connection list and owner-only status endpoint expose safe health metadata:
+last health-check time, last successful check time, consecutive failures, and a provider-safe
+error code. The Google Workspace connection manager displays these values and offers an
+explicit owner-triggered health check for connected or degraded installations. Health
+metadata contains no provider response bodies, access tokens, refresh tokens, or credential
+references. Tenant administrators can inspect the same operational fields in the read-only
+connector governance inventory; this does not grant them access to personal connector
+credentials or the ability to trigger a probe on another user's behalf.
