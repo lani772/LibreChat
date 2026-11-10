@@ -165,15 +165,6 @@ describe('Google Workspace revocation outbox persistence', () => {
   it('lists dead letters without returning encrypted payloads and requeues only in system context', async () => {
     const installation = await createInstallation();
     const job = await enqueue(String(installation._id));
-    await runAsSystem(async () => {
-      await methods().retryGoogleWorkspaceRevocation({
-        id: job.id,
-        leaseToken: 'no-lease-yet',
-        nextAttemptAt: new Date(),
-        errorCode: 'forced_test_failure',
-        maxAttempts: 1,
-      }).catch(() => 'lost');
-    });
     const claimed = await runAsSystem(async () =>
       methods().claimGoogleWorkspaceRevocation({
         leaseToken: 'dead-letter-worker',
