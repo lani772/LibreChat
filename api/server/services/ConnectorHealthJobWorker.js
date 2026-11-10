@@ -11,7 +11,7 @@ const COLLECTION = 'connectorhealthjobs';
 const schema = new mongoose.Schema({
   tenantId: { type: String, required: true },
   ownerUserId: { type: String, required: true },
-  installationId: { type: String, required: true, match: /^[a-f\\d]{24}$/i },
+  installationId: { type: String, required: true, match: /^[a-f\d]{24}$/i },
   provider: { type: String, required: true, enum: ['google-workspace'] },
   status: { type: String, required: true, enum: ['pending', 'processing', 'completed', 'dead'] },
   attempt: { type: Number, required: true, default: 0, min: 0, max: 10 },
@@ -43,7 +43,7 @@ async function enqueueOwnerHealthCheck({ installationId, provider = 'google-work
   if (!tenantId || !ownerUserId || tenantId === '__SYSTEM__') {
     throw new Error('Health jobs require an authenticated tenant owner context');
   }
-  if (!/^[a-f\\d]{24}$/i.test(installationId) || provider !== 'google-workspace') {
+  if (!/^[a-f\d]{24}$/i.test(installationId) || provider !== 'google-workspace') {
     throw new Error('Invalid connector health job target');
   }
   const activeKey = trustedActiveKey(tenantId, ownerUserId, installationId);
