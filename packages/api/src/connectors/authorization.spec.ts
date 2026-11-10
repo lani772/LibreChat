@@ -75,8 +75,9 @@ describe('authorizeConnectorInvocation', () => {
     ).toEqual({ allowed: false, reason: 'permission_denied' });
   });
 
-  it('denies disconnected, authorizing, degraded, revoked, and errored installations', () => {
-    for (const state of ['disconnected', 'authorizing', 'degraded', 'revoked', 'error'] as const) {
+  it('allows degraded installations while denying disconnected, authorizing, revoked, and errored states', () => {
+    expect(authorizeConnectorInvocation(context(), installation({ state: 'degraded' }))).toEqual({ allowed: true });
+    for (const state of ['disconnected', 'authorizing', 'revoked', 'error'] as const) {
       expect(authorizeConnectorInvocation(context(), installation({ state }))).toEqual({
         allowed: false,
         reason: 'connector_not_connected',
