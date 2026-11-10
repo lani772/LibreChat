@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
+jest.mock('@librechat/api', () => ({
+  ConnectorHealthRetryPolicy: class {
+    decide() {
+      return { retry: false, errorCode: 'test_terminal_error' };
+    }
+  },
+}));
+
 jest.mock('@librechat/data-schemas', () => ({
   logger: { error: jest.fn() },
   tenantStorage: {
