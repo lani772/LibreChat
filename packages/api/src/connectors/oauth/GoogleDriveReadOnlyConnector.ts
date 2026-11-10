@@ -99,6 +99,11 @@ export class GoogleDriveReadOnlyConnector {
     this.fetcher = deps.fetcher ?? fetch;
   }
 
+  /** Minimal read-only probe used by the connector health monitor. */
+  async checkHealth(installationId: string): Promise<void> {
+    await this.listFiles({ installationId, pageSize: 1 });
+  }
+
   async listFiles(input: {
     installationId: string;
     query?: string;
