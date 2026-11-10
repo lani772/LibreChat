@@ -64,6 +64,14 @@ describe('ConnectorHealthJobWorker enqueue boundary', () => {
       status: 'pending',
     });
     expect(update.$setOnInsert).not.toHaveProperty('attacker-tenant');
+    expect(update.$setOnInsert.auditOutbox).toEqual([
+      expect.objectContaining({
+        action: 'connector.health_job_scheduled',
+        outcome: 'pending',
+        severity: 'info',
+        metadata: { delayMs: 60_000 },
+      }),
+    ]);
   });
 
   it('rejects missing or system identity', async () => {
