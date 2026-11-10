@@ -10,7 +10,7 @@ export interface ConnectorCredentialRotationCliDeps {
 }
 
 const usage =
-  'Usage: rotate-connector-credentials [--dry-run] [--apply] [--batch-size=1..100] [--max-batches=1..100] [--after=<24-char-object-id>]. Dry-run is the default; --apply is required to persist changes. Configure CONNECTOR_CREDENTIALS_KEYRING and CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID first.';
+  'Usage: rotate-connector-credentials [--dry-run] [--apply] [--batch-size=1..100] [--max-batches=1..100] [--after=<24-char-object-id>] [--after-revocations=<24-char-object-id>]. Dry-run is the default; --apply is required to persist changes. Configure CONNECTOR_CREDENTIALS_KEYRING and CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID first.';
 
 function readInteger(args: string[], name: string, fallback: number): number | undefined {
   const value = args.find((arg) => arg.startsWith(`--${name}=`));
@@ -32,7 +32,7 @@ export async function runConnectorCredentialRotationCli(
   const allowed = new Set(['--dry-run', '--apply']);
   const unknown = args.filter(
     (arg) => !allowed.has(arg) &&
-      !/^--(?:batch-size|max-batches|after)=/.test(arg),
+      !/^--(?:batch-size|max-batches|after|after-revocations)=/.test(arg),
   );
   if (unknown.length || (args.includes('--dry-run') && args.includes('--apply'))) {
     deps.writeError(usage);
@@ -42,6 +42,8 @@ export async function runConnectorCredentialRotationCli(
   const maxBatches = readInteger(args, 'max-batches', 10);
   const afterArg = args.find((arg) => arg.startsWith('--after='));
   const afterId = afterArg?.slice('--after='.length);
+  const afterRevocationsArg = args.find((arg) => arg.startsWith('--after-revocations='));
+  const afterRevocationId = afterRevocationsArg?.slice('--after-revocations='.length);
   if (
     batchSize === undefined ||
     batchSize < 1 ||
@@ -65,6 +67,7 @@ export async function runConnectorCredentialRotationCli(
         batchSize,
         maxBatches,
         ...(afterId ? { afterId } : {}),
+        ...(afterRevocationId ? { afterRevocationId } : {}),
         dryRun: !args.includes('--apply'),
       }),
     );
