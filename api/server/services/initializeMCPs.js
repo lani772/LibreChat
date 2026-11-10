@@ -16,6 +16,7 @@ const {
   GoogleWorkspaceOAuthFlow,
   GoogleWorkspaceTokenLifecycle,
   GoogleDriveReadOnlyConnector,
+  ConnectorHealthMonitor,
   encryptGoogleOAuthVerifier,
   decryptGoogleOAuthVerifier,
   createConnectorAuditWriter,
@@ -39,6 +40,7 @@ let connectorCredentialVault;
 let googleWorkspaceOAuthFlow;
 let googleWorkspaceTokenLifecycle;
 let googleDriveReadOnlyConnector;
+let connectorHealthMonitor;
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -251,12 +253,24 @@ async function initializeMCPs() {
           tokenLifecycle: googleWorkspaceTokenLifecycle,
           vault: connectorCredentialVault,
         });
+        connectorHealthMonitor = new ConnectorHealthMonitor(
+          {
+            getConnectorInstallation: (installationId) => db.getConnectorInstallation(installationId),
+            listConnectorHealthCandidates: (options) => db.listConnectorHealthCandidates(options),
+            recordConnectorHealth: (input) => db.recordConnectorHealth(input),
+          },
+          {
+            'google-workspace': (installationId) =>
+              googleDriveReadOnlyConnector.checkHealth(installationId),
+          },
+        );
         const stopGoogleRevocationWorker = startGoogleWorkspaceRevocationWorker(adapter);
         registerShutdownTask('Google Workspace revocation worker', stopGoogleRevocationWorker);
       } catch {
         googleWorkspaceOAuthFlow = undefined;
         googleWorkspaceTokenLifecycle = undefined;
         googleDriveReadOnlyConnector = undefined;
+        connectorHealthMonitor = undefined;
         logger.warn(
           '[Connectors] Google Workspace OAuth is disabled because its server configuration is invalid.',
         );
@@ -265,6 +279,7 @@ async function initializeMCPs() {
       googleWorkspaceOAuthFlow = undefined;
       googleWorkspaceTokenLifecycle = undefined;
       googleDriveReadOnlyConnector = undefined;
+      connectorHealthMonitor = undefined;
     }
 
     const connectorAuthorizationGuard = createConnectorMCPAuthorizationGuard({
@@ -321,4 +336,5 @@ module.exports.getConnectorCredentialVault = () => connectorCredentialVault;
 module.exports.getGoogleWorkspaceOAuthFlow = () => googleWorkspaceOAuthFlow;
 module.exports.getGoogleWorkspaceTokenLifecycle = () => googleWorkspaceTokenLifecycle;
 module.exports.getGoogleDriveReadOnlyConnector = () => googleDriveReadOnlyConnector;
+module.exports.getConnectorHealthMonitor = () => connectorHealthMonitor;
 module.exports.refreshChangedServerTools = refreshChangedServerTools;
