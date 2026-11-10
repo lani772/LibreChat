@@ -114,7 +114,7 @@ router.put(
     if (
       !tenantId ||
       !principalId ||
-      !/^[a-f\\d]{24}$/i.test(installationId) ||
+      !/^[a-f\d]{24}$/i.test(installationId) ||
       !Number.isInteger(expectedVersion) ||
       expectedVersion < 0 ||
       !Array.isArray(principalIds) ||
