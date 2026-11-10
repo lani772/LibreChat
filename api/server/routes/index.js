@@ -43,6 +43,7 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const connectors = require('./connectors');
+const connectorAdmin = require('./connectorAdmin');
 const rum = require('./rum');
 const insights = require('./insights');
 
@@ -52,6 +53,7 @@ module.exports = {
   rum,
   mcp,
   connectors,
+  connectorAdmin,
   auth,
   adminAuth,
   adminConfig,
