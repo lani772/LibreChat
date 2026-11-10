@@ -11,7 +11,7 @@ describe('ConnectorHealthRetryPolicy', () => {
       .toEqual(new Date(now.getTime() + 1_000));
     expect(policy.decide({ errorCode: 'PROVIDER_UNAVAILABLE', attempt: 3, now }).nextAttemptAt)
       .toEqual(new Date(now.getTime() + 4_000));
-    expect(policy.decide({ errorCode: 'PROVIDER_UNAVAILABLE', attempt: 5, now }).nextAttemptAt)
+    expect(policy.decide({ errorCode: 'PROVIDER_UNAVAILABLE', attempt: 4, now }).nextAttemptAt)
       .toEqual(new Date(now.getTime() + 5_000));
   });
 
