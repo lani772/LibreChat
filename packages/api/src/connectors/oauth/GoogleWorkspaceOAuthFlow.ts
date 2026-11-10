@@ -196,13 +196,14 @@ export class GoogleWorkspaceOAuthFlow {
         if (!connected) {
           throw new Error('Google Workspace connector changed during authorization; reconnect');
         }
+        try {
+          // Still inside the persisted tenant/principal context captured by OAuth state.
+          await this.deps.onConnected?.({ installationId: pending.installationId });
+        } catch {
+          // The connection is already committed. A queue outage must not mark valid credentials as an OAuth failure.
+        }
         return { installationId: pending.installationId, connected: true as const };
       });
-      try {
-        await this.deps.onConnected?.({ installationId: pending.installationId });
-      } catch {
-        // The connection is already committed. A queue outage must not mark valid credentials as an OAuth failure.
-      }
       return result;
     } catch (error) {
       await this.deps.runWithIdentity(identity, async () => {
