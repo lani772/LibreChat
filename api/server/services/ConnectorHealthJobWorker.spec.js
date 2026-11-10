@@ -37,7 +37,7 @@ jest.mock('@librechat/api', () => ({
   },
 }));
 
-const { enqueueOwnerHealthCheck, listOwnerHealthJobs, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
+const { claimJob, enqueueOwnerHealthCheck, listOwnerHealthJobs, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
 
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
@@ -175,5 +175,27 @@ describe('ConnectorHealthJobWorker dead-job recovery', () => {
       jobId: '507f1f77bcf86cd799439012',
     })).rejects.toThrow('authenticated tenant owner context');
     expect(mockModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectorHealthJobWorker lease recovery claim', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
+  });
+
+  it('atomically fences an expired lease and appends a durable recovery event', async () => {
+    await claimJob();
+    const [filter, pipeline, options] = mockModel.findOneAndUpdate.mock.calls[0];
+    expect(filter).toMatchObject({ status: 'processing', leaseUntil: { $lte: expect.any(Date) } });
+    expect(Array.isArray(pipeline)).toBe(true);
+    expect(pipeline[0].$set.fence).toEqual({ $add: ['$fence', 1] });
+    expect(pipeline[0].$set.auditOutbox.$concatArrays[1][0]).toMatchObject({
+      action: 'connector.health_job_lease_recovered',
+      outcome: 'pending',
+      severity: 'warning',
+    });
+    expect(options).toMatchObject({ new: true });
   });
 });
