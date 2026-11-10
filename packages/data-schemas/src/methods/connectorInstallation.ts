@@ -38,6 +38,7 @@ export interface ConnectorInstallationMethods {
     mcpServerId: string;
     expectedVersion: number;
   }): Promise<ConnectorInstallationDocument | null>;
+  listConnectorHealthCandidates(options: { limit: number }): Promise<ConnectorInstallationDocument[]>;
   listConnectorInstallations(options?: {
     ownerUserId?: string;
     provider?: string;
@@ -216,6 +217,20 @@ export function createConnectorInstallationMethods(
       .exec();
   }
 
+  /** Oldest health observations first so repeated bounded batches make progress. */
+  async function listConnectorHealthCandidates(options: { limit: number }): Promise<ConnectorInstallationDocument[]> {
+    requireConnectorTenant('health candidate list');
+    if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 25) {
+      throw new Error('Connector health batch size must be between 1 and 25');
+    }
+    return Model.find({ state: { $in: ['connected', 'degraded'] } })
+      .select('-credentialRef')
+      .sort({ lastHealthCheckAt: 1, _id: 1 })
+      .limit(options.limit)
+      .lean<ConnectorInstallationDocument[]>()
+      .exec();
+  }
+
   async function transitionConnectorInstallation(params: {
     installationId: string;
     expectedVersion: number;
@@ -381,6 +396,7 @@ export function createConnectorInstallationMethods(
     getConnectorInstallationBindingByMCPServerId,
     bindConnectorInstallationToMCPServer,
     listConnectorInstallations,
+    listConnectorHealthCandidates,
     transitionConnectorInstallation,
     recordConnectorHealth,
     revokeConnectorInstallation,
