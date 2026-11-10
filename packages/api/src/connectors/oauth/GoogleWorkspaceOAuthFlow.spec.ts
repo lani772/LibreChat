@@ -35,15 +35,16 @@ function setup() {
     }),
   };
   const runWithIdentity = jest.fn(<T>(_identity: { tenantId: string; principalId: string }, operation: () => Promise<T>): Promise<T> => operation());
+  const onConnected = jest.fn().mockResolvedValue(undefined);
   const flow = new GoogleWorkspaceOAuthFlow({
-    adapter, vault, installations, states, runWithIdentity,
+    adapter, vault, installations, states, runWithIdentity, onConnected,
     clientId: 'client-id',
     redirectUri: 'https://app.example.test/oauth/google/callback',
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
     now: () => 1_000_000,
     randomBytes: (size) => Buffer.alloc(size, size),
   });
-  return { flow, adapter, vault, installations, states, runWithIdentity, pending };
+  return { flow, adapter, vault, installations, states, runWithIdentity, onConnected, pending };
 }
 
 describe('GoogleWorkspaceOAuthFlow', () => {
@@ -71,7 +72,7 @@ describe('GoogleWorkspaceOAuthFlow', () => {
   });
 
   it('consumes state once, exchanges code with PKCE, and stores tokens in the vault', async () => {
-    const { flow, vault, adapter, runWithIdentity } = setup();
+    const { flow, vault, adapter, runWithIdentity, onConnected, installations } = setup();
     const started = await flow.begin({ identity, installationId: '507f1f77bcf86cd799439011' });
     const state = new URL(started.authorizationUrl).searchParams.get('state')!;
     const result = await flow.complete({ state, code: 'auth-code' });
@@ -81,6 +82,8 @@ describe('GoogleWorkspaceOAuthFlow', () => {
       codeVerifier: expect.any(String),
     }));
     expect(runWithIdentity).toHaveBeenCalledWith(identity, expect.any(Function));
+    expect(installations.transitionConnectorInstallation).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'connected' }));
+    expect(onConnected).toHaveBeenCalledWith({ installationId: '507f1f77bcf86cd799439011' });
     expect(vault.storeCredentials).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439011', 'google-workspace',
       expect.objectContaining({ accessToken: 'access-secret', refreshToken: 'refresh-secret' }),
