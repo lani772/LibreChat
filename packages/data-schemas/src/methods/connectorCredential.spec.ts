@@ -316,4 +316,28 @@ describe('connector credential persistence', () => {
     expect(updated.encryptedPayload).toBe('new-ciphertext');
   });
 
+  it('excludes credentials with an active token refresh lease from rotation scans', async () => {
+    const installation = await createInstallation();
+    const installationId = String(installation._id);
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().putConnectorCredential({
+        installationId,
+        provider: 'chatwoot',
+        encryptedPayload: 'leased-ciphertext',
+        keyVersion: 'gcm1',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+      methods().claimConnectorCredentialRefresh({
+        installationId,
+        leaseToken: 'active-refresh',
+        leaseUntil: new Date(Date.now() + 60_000),
+      }),
+    );
+    const rows = await runAsSystem(async () =>
+      methods().listConnectorCredentialsForRotation({ limit: 10 }),
+    );
+    expect(rows).toHaveLength(0);
+  });
+
 });
