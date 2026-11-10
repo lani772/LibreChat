@@ -1,5 +1,5 @@
 const { Tool } = require('@librechat/agents/langchain/tools');
-const { getUserId } = require('@librechat/data-schemas');
+const { getUserId, getTenantId } = require('@librechat/data-schemas');
 const db = require('~/models');
 const { getGoogleDriveReadOnlyConnector } = require('~/server/services/initializeMCPs');
 
@@ -56,11 +56,16 @@ class GoogleDrive extends Tool {
 
   async resolveInstallation(installationId) {
     const principalId = getUserId();
+    const tenantId = getTenantId();
+    if (!tenantId) {
+      throw new Error('Google Workspace tenant context is unavailable');
+    }
     if (!principalId) {
       throw new Error('Google Workspace identity is unavailable');
     }
     if (installationId) {
-      // The provider connector performs the definitive tenant/owner/grant check.
+      // Never trust the tool argument as authorization. The provider connector performs
+      // the definitive tenant, membership, owner/grant, and connector-state checks.
       return installationId;
     }
     const installations = await db.listConnectorInstallations({
