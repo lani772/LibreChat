@@ -153,6 +153,44 @@ async function listOwnerHealthJobs({ installationId, limit = 10 }) {
   }));
 }
 
+/** Owner-authorized replay of a dead job; identity is read only from trusted context. */
+async function retryOwnerDeadHealthJob({ installationId, jobId }) {
+  const tenantId = getTenantId();
+  const ownerUserId = getUserId();
+  if (!tenantId || !ownerUserId || tenantId === '__SYSTEM__') {
+    throw new Error('Health job recovery requires an authenticated tenant owner context');
+  }
+  if (!/^[a-f\\d]{24}$/i.test(installationId) || !/^[a-f\\d]{24}$/i.test(jobId)) {
+    throw new Error('Invalid connector health job recovery target');
+  }
+  await indexesReady;
+  const activeKey = trustedActiveKey(tenantId, ownerUserId, installationId);
+  const event = healthJobAuditEvent(
+    'connector.health_job_scheduled',
+    'pending',
+    'warning',
+    { source: 'owner_dead_job_recovery' },
+  );
+  let job;
+  try {
+    job = await HealthJob.findOneAndUpdate(
+      { _id: jobId, tenantId, ownerUserId, installationId, status: 'dead', provider: 'google-workspace' },
+      {
+        $set: { status: 'pending', attempt: 0, nextAttemptAt: new Date(), activeKey, lastErrorCode: null },
+        $unset: { leaseToken: 1, leaseUntil: 1 },
+        $push: { auditOutbox: event },
+      },
+      { new: true },
+    ).lean().exec();
+  } catch (error) {
+    if (error?.code === 11000) throw new Error('An active health job already exists for this connector');
+    throw error;
+  }
+  if (!job) return null;
+  await flushHealthJobAuditOutbox(job._id, require('~/models')).catch(() => undefined);
+  return { id: job._id.toString(), status: job.status, nextAttemptAt: job.nextAttemptAt };
+}
+
 async function claimJob() {
   const now = new Date();
   const token = randomUUID();
@@ -175,7 +213,7 @@ async function claimJob() {
         auditOutbox: {
           $concatArrays: [
             { $ifNull: ['$auditOutbox', []] },
-            [{ ...leaseEvent, metadata: { ...leaseEvent.metadata, previousFence: '$fence' } }],
+            [{ ...leaseEvent, metadata: { ...leaseEvent.metadata, previousFence: { $toString: '$fence' } } }],
           ],
         },
       },
@@ -322,6 +360,7 @@ function stopConnectorHealthJobWorker() {
 module.exports = {
   enqueueOwnerHealthCheck,
   listOwnerHealthJobs,
+  retryOwnerDeadHealthJob,
   startConnectorHealthJobWorker,
   stopConnectorHealthJobWorker,
 };
