@@ -27,7 +27,7 @@ const {
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
 const { startMCPAuthorizationFenceRetryWorker } = require('./MCPAuthorizationFenceRetry');
 const { startGoogleWorkspaceRevocationWorker } = require('./GoogleWorkspaceRevocationWorker');
-const { startConnectorHealthJobWorker } = require('./ConnectorHealthJobWorker');
+const { startConnectorHealthJobWorker, enqueueOwnerHealthCheck } = require('./ConnectorHealthJobWorker');
 const {
   getMCPToolsCacheGeneration,
   renewMCPToolsCacheGeneration,
@@ -221,6 +221,11 @@ async function initializeMCPs() {
                 codeVerifier: decryptGoogleOAuthVerifier(encryptedCodeVerifier, context),
               };
             },
+          },
+          onConnected: async ({ installationId }) => {
+            // GoogleWorkspaceOAuthFlow invokes this only after successful token storage
+            // and the connected-state transition, while the trusted owner context is active.
+            await enqueueOwnerHealthCheck({ installationId, delayMs: 60_000 });
           },
           runWithIdentity: (identity, operation) => {
             const current = tenantStorage.getStore() || {};
