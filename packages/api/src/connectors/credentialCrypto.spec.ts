@@ -17,8 +17,6 @@ describe('connector credential authenticated encryption', () => {
     process.env.CONNECTOR_CREDENTIALS_KEY = '11'.repeat(32);
     delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
     delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
-    delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
-    delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
   });
 
   afterAll(() => {
