@@ -379,18 +379,18 @@ describe('connector installation persistence', () => {
     const first = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
         installationId: String(created._id), expectedVersion: 2,
-        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2,
+        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2, expectedHealthVersion: 0,
       }),
     );
-    expect(first).toMatchObject({ state: 'connected', consecutiveHealthFailures: 1, version: 3 });
+    expect(first).toMatchObject({ state: 'connected', consecutiveHealthFailures: 1, healthVersion: 1, version: 2 });
 
     const second = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
-        installationId: String(created._id), expectedVersion: 3,
+        installationId: String(created._id), expectedHealthVersion: 1,
         outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2,
       }),
     );
-    expect(second).toMatchObject({ state: 'degraded', consecutiveHealthFailures: 2, version: 4 });
+    expect(second).toMatchObject({ state: 'degraded', consecutiveHealthFailures: 2, healthVersion: 2, version: 2 });
     expect(second?.lastErrorCode).toBe('google_provider_unavailable');
   });
 
@@ -418,11 +418,11 @@ describe('connector installation persistence', () => {
     );
     const recovered = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
-        installationId: String(created._id), expectedVersion: 3, outcome: 'healthy',
+        installationId: String(created._id), expectedHealthVersion: 1, outcome: 'healthy',
       }),
     );
     expect(recovered).toMatchObject({
-      state: 'connected', consecutiveHealthFailures: 0, version: 4,
+      state: 'connected', consecutiveHealthFailures: 0, healthVersion: 2, version: 3,
     });
     expect(recovered?.lastErrorCode).toBeNull();
     expect(recovered?.lastSuccessfulHealthCheckAt).toBeInstanceOf(Date);
@@ -439,7 +439,7 @@ describe('connector installation persistence', () => {
     );
     await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
       methods().recordConnectorHealth({
-        installationId: String(created._id), expectedVersion: 1, outcome: 'healthy',
+        installationId: String(created._id), expectedHealthVersion: 0, outcome: 'healthy',
       }),
     )).resolves.toBeNull();
   });
