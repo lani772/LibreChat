@@ -10,8 +10,6 @@ function response(status: number, body: unknown): Response {
 describe('GoogleDriveReadOnlyConnector', () => {
   const execute = jest.fn(async (_id: string, operation: (connector: unknown) => Promise<unknown>) =>
     operation({ installation: { _id: INSTALLATION_ID } }));
-  const executeHealthCheck = jest.fn(async (_id: string, operation: (connector: unknown) => Promise<unknown>) =>
-    operation({ installation: { _id: INSTALLATION_ID } }));
   const withCredentials = jest.fn(async (_id: string, operation: (credentials: Record<string, unknown>) => Promise<unknown>) =>
     operation({ scopes: [SCOPE] }));
   const getAccessToken = jest.fn().mockResolvedValue('short-lived-access-token');
@@ -21,7 +19,7 @@ describe('GoogleDriveReadOnlyConnector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     connector = new GoogleDriveReadOnlyConnector({
-      connectors: { execute, executeHealthCheck },
+      connectors: { execute },
       vault: { withCredentials },
       tokenLifecycle: { getAccessToken },
       fetcher,
@@ -47,7 +45,7 @@ describe('GoogleDriveReadOnlyConnector', () => {
   it('provides a minimal read-only health probe', async () => {
     fetcher.mockResolvedValue(response(200, { files: [] }));
     await expect(connector.checkHealth(INSTALLATION_ID)).resolves.toBeUndefined();
-    expect(executeHealthCheck).toHaveBeenCalledWith(INSTALLATION_ID, expect.any(Function));
+    expect(execute).toHaveBeenCalledWith(INSTALLATION_ID, expect.any(Function));
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'GET' });
   });
