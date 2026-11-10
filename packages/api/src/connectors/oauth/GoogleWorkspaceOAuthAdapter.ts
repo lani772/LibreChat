@@ -117,7 +117,13 @@ export class GoogleWorkspaceOAuthAdapter implements ConnectorOAuthAdapter {
     code: string;
     redirectUri: string;
     codeVerifier?: string;
-  }) {
+  }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    scopes: string[];
+    tokenType: string;
+  }> {
     if (!input.code?.trim() || !input.redirectUri?.trim()) {
       throw new Error('Authorization code and redirect URI are required');
     }
@@ -143,7 +149,13 @@ export class GoogleWorkspaceOAuthAdapter implements ConnectorOAuthAdapter {
     };
   }
 
-  async refreshAccessToken(input: { refreshToken: string }) {
+  async refreshAccessToken(input: { refreshToken: string }): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt: number;
+    scopes: string[];
+    tokenType: string;
+  }> {
     if (!input.refreshToken?.trim()) {
       throw new Error('A refresh token is required');
     }
