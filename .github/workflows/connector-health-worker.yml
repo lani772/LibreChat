@@ -22,6 +22,8 @@ on:
       - 'api/server/services/ConnectorHealthJobWorker*.spec.js'
       - 'api/server/routes/connectors.js'
       - 'api/server/routes/__tests__/connectors.spec.js'
+      - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.tsx'
+      - 'client/src/components/SidePanel/MCPBuilder/GoogleWorkspaceConnections.spec.tsx'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.ts'
       - 'packages/api/src/connectors/ConnectorHealthRetryPolicy.spec.ts'
       - '.github/workflows/connector-health-worker.yml'
