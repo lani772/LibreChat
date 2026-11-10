@@ -191,4 +191,45 @@ describe('Google Workspace revocation outbox persistence', () => {
     );
     expect(nextClaim).toBeNull();
   });
+  it('allows only system context to scan and compare-and-set rotation of encrypted outbox payloads', async () => {
+    const installation = await createInstallation();
+    await enqueue(String(installation._id));
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+        methods().listConnectorRevocationsForRotation({ limit: 10 }),
+      ),
+    ).rejects.toThrow('explicit system context');
+
+    const [record] = await runAsSystem(async () =>
+      methods().listConnectorRevocationsForRotation({ limit: 10 }),
+    );
+    expect(record).toBeDefined();
+    expect(record.encryptedPayload).toContain('encrypted-only');
+    const updated = await runAsSystem(async () =>
+      methods().replaceConnectorRevocationForRotation({
+        id: record.id,
+        tenantId: record.tenantId,
+        expectedEncryptedPayload: record.encryptedPayload,
+        expectedUpdatedAt: record.updatedAt,
+        encryptedPayload: 'rotated-envelope',
+      }),
+    );
+    expect(updated).toBe(true);
+    const [after] = await runAsSystem(async () =>
+      methods().listConnectorRevocationsForRotation({ limit: 10 }),
+    );
+    expect(after.encryptedPayload).toBe('rotated-envelope');
+
+    const stale = await runAsSystem(async () =>
+      methods().replaceConnectorRevocationForRotation({
+        id: record.id,
+        tenantId: record.tenantId,
+        expectedEncryptedPayload: record.encryptedPayload,
+        expectedUpdatedAt: record.updatedAt,
+        encryptedPayload: 'stale-envelope',
+      }),
+    );
+    expect(stale).toBe(false);
+  });
+
 });
