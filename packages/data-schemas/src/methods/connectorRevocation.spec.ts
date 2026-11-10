@@ -162,6 +162,66 @@ describe('Google Workspace revocation outbox persistence', () => {
     expect(stored?.encryptedPayload).toBeNull();
   });
 
+  it('lists dead letters without returning encrypted payloads and requeues only in system context', async () => {
+    const installation = await createInstallation();
+    const job = await enqueue(String(installation._id));
+    await runAsSystem(async () => {
+      await methods().retryGoogleWorkspaceRevocation({
+        id: job.id,
+        leaseToken: 'no-lease-yet',
+        nextAttemptAt: new Date(),
+        errorCode: 'forced_test_failure',
+        maxAttempts: 1,
+      }).catch(() => 'lost');
+    });
+    const claimed = await runAsSystem(async () =>
+      methods().claimGoogleWorkspaceRevocation({
+        leaseToken: 'dead-letter-worker',
+        leaseUntil: new Date(Date.now() + 60_000),
+      }),
+    );
+    expect(claimed?.id).toBe(job.id);
+    await runAsSystem(async () =>
+      methods().retryGoogleWorkspaceRevocation({
+        id: job.id,
+        leaseToken: 'dead-letter-worker',
+        nextAttemptAt: new Date(Date.now() + 60_000),
+        errorCode: 'remote_revocation_failed',
+        maxAttempts: 1,
+      }),
+    );
+
+    const dead = await runAsSystem(async () =>
+      methods().listGoogleWorkspaceRevocationDeadLetters({ limit: 10 }),
+    );
+    expect(dead).toHaveLength(1);
+    expect(dead[0]).toMatchObject({
+      id: job.id,
+      installationId: String(installation._id),
+      attempts: 1,
+      lastErrorCode: 'remote_revocation_failed',
+    });
+    expect(dead[0]).not.toHaveProperty('encryptedPayload');
+
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'owner-a' }, () =>
+        methods().requeueGoogleWorkspaceRevocationDeadLetter({ id: job.id }),
+      ),
+    ).rejects.toThrow('explicit system context');
+    const requeued = await runAsSystem(async () =>
+      methods().requeueGoogleWorkspaceRevocationDeadLetter({ id: job.id }),
+    );
+    expect(requeued).toBe(true);
+    const nextClaim = await runAsSystem(async () =>
+      methods().claimGoogleWorkspaceRevocation({
+        leaseToken: 'retry-worker',
+        leaseUntil: new Date(Date.now() + 60_000),
+      }),
+    );
+    expect(nextClaim?.id).toBe(job.id);
+    expect(nextClaim?.attempts).toBe(1);
+  });
+
   it('reschedules failures and moves exhausted jobs to dead state', async () => {
     const installation = await createInstallation();
     const job = await enqueue(String(installation._id));
