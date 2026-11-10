@@ -67,8 +67,18 @@ export async function rotateConnectorCredentialEncryption(input: {
     throw new Error('Credential rotation keyring configuration is invalid');
   }
   if (!keyring || typeof keyring !== 'object' || Array.isArray(keyring) ||
-      typeof keyring[activeKeyId] !== 'string') {
+      typeof keyring[activeKeyId] !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(keyring[activeKeyId] as string)) {
     throw new Error('Credential rotation active key is unavailable');
+  }
+  // Validate the complete keyring even when the collection is empty.
+  const keyProbe = encryptConnectorCredential('', {
+    tenantId: '__credential_rotation_validation__',
+    installationId: '000000000000000000000000',
+    provider: 'google-workspace',
+  });
+  if (keyProbe.keyId !== activeKeyId) {
+    throw new Error('Credential rotation active key is not selected for encryption');
   }
 
   const result: ConnectorCredentialRotationResult = {
