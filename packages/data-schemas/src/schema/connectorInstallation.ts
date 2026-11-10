@@ -2,7 +2,7 @@ import { Schema } from 'mongoose';
 import { CONNECTOR_INSTALLATION_STATES } from '~/types/connectorInstallation';
 import type { ConnectorInstallationDocument } from '~/types/connectorInstallation';
 
-const connectorInstallationSchema = new Schema<ConnectorInstallationDocument>(
+const connectorInstallationSchema: Schema<ConnectorInstallationDocument> = new Schema<ConnectorInstallationDocument>(
   {
     tenantId: { type: String, index: true },
     ownerUserId: { type: String, required: true, index: true },
