@@ -420,6 +420,7 @@ async function stopConnectorHealthJobWorker() {
 module.exports = {
   claimJob,
   processClaim,
+  flushHealthJobAuditOutbox,
   renewClaim,
   enqueueOwnerHealthCheck,
   listOwnerHealthJobs,
