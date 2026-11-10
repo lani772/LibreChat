@@ -37,7 +37,7 @@ jest.mock('@librechat/api', () => ({
   },
 }));
 
-const { enqueueOwnerHealthCheck, listOwnerHealthJobs } = require('./ConnectorHealthJobWorker');
+const { enqueueOwnerHealthCheck, listOwnerHealthJobs, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
 
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
@@ -131,5 +131,49 @@ describe('ConnectorHealthJobWorker owner visibility', () => {
     await expect(listOwnerHealthJobs({ installationId: '507f1f77bcf86cd799439011', limit: 1000 }))
       .rejects.toThrow('Invalid connector health job query');
     expect(mockModel.find).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectorHealthJobWorker dead-job recovery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
+  });
+
+  it('requeues only a dead job owned by the trusted tenant principal', async () => {
+    const result = await retryOwnerDeadHealthJob({
+      installationId: '507f1f77bcf86cd799439011',
+      jobId: '507f1f77bcf86cd799439012',
+    });
+    const [filter, update] = mockModel.findOneAndUpdate.mock.calls[0];
+    expect(filter).toEqual({
+      _id: '507f1f77bcf86cd799439012',
+      tenantId: 'tenant-a',
+      ownerUserId: 'owner-a',
+      installationId: '507f1f77bcf86cd799439011',
+      status: 'dead',
+      provider: 'google-workspace',
+    });
+    expect(update.$set).toMatchObject({
+      status: 'pending',
+      attempt: 0,
+      activeKey: 'tenant-a:owner-a:507f1f77bcf86cd799439011',
+      lastErrorCode: null,
+    });
+    expect(update.$push.auditOutbox).toMatchObject({
+      action: 'connector.health_job_scheduled',
+      metadata: { source: 'owner_dead_job_recovery' },
+    });
+    expect(result).toMatchObject({ id: 'job-1', status: undefined });
+  });
+
+  it('rejects replay without trusted identity and does not touch storage', async () => {
+    mockTenantId = '__SYSTEM__';
+    await expect(retryOwnerDeadHealthJob({
+      installationId: '507f1f77bcf86cd799439011',
+      jobId: '507f1f77bcf86cd799439012',
+    })).rejects.toThrow('authenticated tenant owner context');
+    expect(mockModel.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });
