@@ -241,6 +241,57 @@ describe('connector installation persistence', () => {
     ).resolves.toBeNull();
   });
 
+  it('does not allow another tenant member to change the owner’s personal connector grants', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace',
+        displayName: 'Owner workspace',
+        visibility: 'personal',
+      }),
+    );
+
+    const attempted = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'user-b' },
+      async () =>
+        methods().updateConnectorInstallationGrants({
+          installationId: String(created._id),
+          expectedVersion: 0,
+          principalIds: ['user-b'],
+        }),
+    );
+
+    expect(attempted).toBeNull();
+    const unchanged = await tenantStorage.run(
+      { tenantId: 'tenant-a', userId: 'user-a' },
+      async () => methods().getConnectorInstallation(String(created._id)),
+    );
+    expect(unchanged?.grantedPrincipalIds).toEqual([]);
+    expect(unchanged?.version).toBe(0);
+  });
+
+  it('does not allow grant changes after an installation is revoked', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace',
+        displayName: 'Revoked workspace',
+        visibility: 'personal',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().revokeConnectorInstallation(String(created._id)),
+    );
+
+    await expect(
+      tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+        methods().updateConnectorInstallationGrants({
+          installationId: String(created._id),
+          expectedVersion: 1,
+          principalIds: ['user-b'],
+        }),
+      ),
+    ).resolves.toBeNull();
+  });
+
   it('refuses unscoped creation even when global tenant strict mode is disabled', async () => {
     await expect(
       methods().createConnectorInstallation({
