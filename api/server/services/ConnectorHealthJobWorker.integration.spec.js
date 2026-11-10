@@ -23,6 +23,8 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
   let mongo;
   let worker;
   let HealthJob;
+  let replicaConnection;
+  let ReplicaHealthJob;
 
   beforeAll(async () => {
     mongo = await MongoMemoryServer.create();
@@ -31,9 +33,16 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
     worker = require('./ConnectorHealthJobWorker');
     HealthJob = mongoose.models.ConnectorHealthJob;
     await HealthJob.init();
+    // A second independent Mongoose connection models a second worker replica.
+    replicaConnection = await mongoose.createConnection(mongo.getUri(), {
+      dbName: 'connector-health-worker-test',
+    }).asPromise();
+    ReplicaHealthJob = replicaConnection.model('ConnectorHealthJob', HealthJob.schema);
+    await ReplicaHealthJob.init();
   }, 120_000);
 
   afterAll(async () => {
+    await replicaConnection?.close();
     await mongoose.disconnect();
     await mongo?.stop();
   });
@@ -58,7 +67,7 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
   it('allows only one replica to claim a due job', async () => {
     await createPendingJob();
 
-    const claims = await Promise.all([worker.claimJob(), worker.claimJob()]);
+    const claims = await Promise.all([worker.claimJob(), worker.claimJob({ model: ReplicaHealthJob })]);
     const winners = claims.filter(Boolean);
 
     expect(winners).toHaveLength(1);
@@ -78,7 +87,7 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
       fence: 4,
     });
 
-    const claims = await Promise.all([worker.claimJob(), worker.claimJob()]);
+    const claims = await Promise.all([worker.claimJob(), worker.claimJob({ model: ReplicaHealthJob })]);
     const winners = claims.filter(Boolean);
     expect(winners).toHaveLength(1);
     expect(winners[0].fence).toBe(5);
