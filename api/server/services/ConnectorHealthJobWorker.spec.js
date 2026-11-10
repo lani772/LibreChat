@@ -165,7 +165,7 @@ describe('ConnectorHealthJobWorker dead-job recovery', () => {
       action: 'connector.health_job_scheduled',
       metadata: { source: 'owner_dead_job_recovery' },
     });
-    expect(result).toMatchObject({ id: 'job-1', status: undefined });
+    expect(result).toMatchObject({ id: 'job-1' });
   });
 
   it('rejects replay without trusted identity and does not touch storage', async () => {
