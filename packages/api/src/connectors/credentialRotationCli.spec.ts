@@ -4,6 +4,20 @@ import {
 } from './credentialRotationCli';
 
 describe('connector credential rotation CLI', () => {
+  const originalKeyring = process.env.CONNECTOR_CREDENTIALS_KEYRING;
+  const originalActiveKeyId = process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
+
+  beforeEach(() => {
+    process.env.CONNECTOR_CREDENTIALS_KEYRING = JSON.stringify({ 'cli-test-key': '22'.repeat(32) });
+    process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = 'cli-test-key';
+  });
+
+  afterAll(() => {
+    if (originalKeyring === undefined) delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
+    else process.env.CONNECTOR_CREDENTIALS_KEYRING = originalKeyring;
+    if (originalActiveKeyId === undefined) delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
+    else process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID = originalActiveKeyId;
+  });
   function harness() {
     const output: string[] = [];
     const errors: string[] = [];
