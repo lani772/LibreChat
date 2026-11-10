@@ -408,6 +408,7 @@ function stopConnectorHealthJobWorker() {
 
 module.exports = {
   claimJob,
+  processClaim,
   renewClaim,
   enqueueOwnerHealthCheck,
   listOwnerHealthJobs,
