@@ -161,7 +161,7 @@ export class MCPManager extends UserConnectionManager {
     catalogRecoveryMaxStateEntries?: number,
     catalogRecoveryMaxDetachedDiscoveries?: number,
     private readonly appBindingCodec: MCPAppBindingCodec | undefined = undefined,
-    private readonly connectorAuthorizationGuard?: ConnectorMCPAuthorizationGuard,
+    private readonly connectorAuthorizationGuard: ConnectorMCPAuthorizationGuard | undefined = undefined,
   ) {
     super();
     this.catalogRecoveryTracker = new MCPServerCatalogRecoveryTracker(
