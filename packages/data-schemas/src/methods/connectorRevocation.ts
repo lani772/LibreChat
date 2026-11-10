@@ -381,6 +381,8 @@ export function createConnectorRevocationMethods(
   }
 
   return {
+    listGoogleWorkspaceRevocationDeadLetters,
+    requeueGoogleWorkspaceRevocationDeadLetter,
     listConnectorRevocationsForRotation,
     replaceConnectorRevocationForRotation,
     enqueueGoogleWorkspaceRevocation,
