@@ -71,7 +71,7 @@ const ALLOWED_TRANSITIONS: Record<ConnectorInstallationState, readonly Connector
   disconnected: ['authorizing', 'revoked'],
   authorizing: ['connected', 'disconnected', 'error', 'revoked'],
   connected: ['degraded', 'disconnected', 'revoked', 'error'],
-  degraded: ['connected', 'disconnected', 'revoked', 'error'],
+  degraded: ['authorizing', 'connected', 'disconnected', 'revoked', 'error'],
   revoked: [],
   error: ['authorizing', 'disconnected', 'revoked'],
 };
