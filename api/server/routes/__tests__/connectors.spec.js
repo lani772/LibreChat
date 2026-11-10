@@ -220,9 +220,10 @@ describe('Google Workspace connector routes', () => {
   });
 
   it('does not require an explicit grant for the installation owner', async () => {
+    getUserId.mockReturnValue('507f191e810c19729de860ea');
     const response = await request(app)
       .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
-      .send({ expectedVersion: 0, principalIds: ['user-a'] });
+      .send({ expectedVersion: 0, principalIds: ['507f191e810c19729de860ea'] });
 
     expect(response.status).toBe(400);
     expect(db.getConnectorInstallation).not.toHaveBeenCalled();
