@@ -2,7 +2,7 @@ import { Schema } from 'mongoose';
 import type { GoogleOAuthStateDocument } from '~/types/googleOAuthState';
 
 /** Short-lived OAuth transaction state. It is globally addressable only by a high-entropy hash. */
-const googleOAuthStateSchema = new Schema<GoogleOAuthStateDocument>(
+const googleOAuthStateSchema: Schema<GoogleOAuthStateDocument> = new Schema<GoogleOAuthStateDocument>(
   {
     stateHash: { type: String, required: true, match: /^[A-Za-z0-9_-]{43}$/, immutable: true },
     tenantId: { type: String, required: true, immutable: true },
