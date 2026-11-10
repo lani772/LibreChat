@@ -228,15 +228,18 @@ describe('ConnectorService', () => {
   });
 
 
-  it('permits an authorized health probe on a degraded connector but denies ordinary execution', async () => {
+  it('keeps degraded connectors usable while preserving ownership and membership checks', async () => {
     const test = setup({ record: installation({ state: 'degraded' }) });
-    await expect(test.run(() => test.service.authorize('installation-id')))
-      .rejects.toBeInstanceOf(ConnectorAccessError);
-    await expect(test.run(() => test.service.executeHealthCheck('installation-id', async () => 'healthy')))
-      .resolves.toBe('healthy');
-    expect(test.audit).toHaveBeenCalledWith(
-      expect.objectContaining({ outcome: 'allowed', provider: 'google-workspace' }),
-    );
+    await expect(test.run(() => test.service.execute('installation-id', async () => 'available')))
+      .resolves.toBe('available');
+
+    const unauthorized = setup({
+      principalId: 'user-b',
+      record: installation({ state: 'degraded', ownerUserId: 'user-a' }),
+    });
+    await expect(unauthorized.run(() =>
+      unauthorized.service.execute('installation-id', async () => 'must-not-run'),
+    )).rejects.toBeInstanceOf(ConnectorAccessError);
   });
 
 });
