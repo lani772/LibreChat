@@ -223,12 +223,15 @@ export function createConnectorInstallationMethods(
     if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 25) {
       throw new Error('Connector health batch size must be between 1 and 25');
     }
+    const ownerUserId = getUserId();
+    if (!ownerUserId) throw new Error('Connector health checks require an authenticated owner context');
     const providers = options.providers?.map((provider) => provider.trim().toLowerCase()).filter(Boolean);
     if (options.providers && (!providers?.length || providers.length > 20 ||
         providers.some((provider) => !PROVIDER_PATTERN.test(provider)))) {
       throw new Error('Connector health provider filter is invalid');
     }
     return Model.find({
+      ownerUserId,
       state: { $in: ['connected', 'degraded'] },
       ...(providers ? { provider: { $in: providers } } : {}),
     })
