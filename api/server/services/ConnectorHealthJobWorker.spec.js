@@ -3,8 +3,8 @@ const mockModel = {
   findOneAndUpdate: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
   findOne: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
 };
-let tenantId = 'tenant-a';
-let userId = 'owner-a';
+let mockTenantId = 'tenant-a';
+let mockUserId = 'owner-a';
 
 jest.mock('mongoose', () => {
   class Schema {
@@ -20,8 +20,8 @@ jest.mock('mongoose', () => {
 jest.mock('@librechat/data-schemas', () => ({
   logger: { error: jest.fn() },
   tenantStorage: { run: (_identity, operation) => operation() },
-  getTenantId: () => tenantId,
-  getUserId: () => userId,
+  getTenantId: () => mockTenantId,
+  getUserId: () => mockUserId,
   runAsSystem: (operation) => operation(),
 }));
 
@@ -36,8 +36,8 @@ const { enqueueOwnerHealthCheck } = require('./ConnectorHealthJobWorker');
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    tenantId = 'tenant-a';
-    userId = 'owner-a';
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
   });
 
   it('persists tenant and owner from trusted context, not caller arguments', async () => {
@@ -45,13 +45,13 @@ describe('ConnectorHealthJobWorker enqueue boundary', () => {
       installationId: '507f1f77bcf86cd799439011',
       provider: 'google-workspace',
       delayMs: 60_000,
-      tenantId: 'attacker-tenant',
+      mockTenantId: 'attacker-tenant',
       ownerUserId: 'attacker-user',
     });
     const [filter, update] = mockModel.findOneAndUpdate.mock.calls[0];
     expect(filter.activeKey).toBe('tenant-a:owner-a:507f1f77bcf86cd799439011');
     expect(update.$setOnInsert).toMatchObject({
-      tenantId: 'tenant-a',
+      mockTenantId: 'tenant-a',
       ownerUserId: 'owner-a',
       installationId: '507f1f77bcf86cd799439011',
       provider: 'google-workspace',
@@ -61,11 +61,11 @@ describe('ConnectorHealthJobWorker enqueue boundary', () => {
   });
 
   it('rejects missing or system identity', async () => {
-    tenantId = '__SYSTEM__';
+    mockTenantId = '__SYSTEM__';
     await expect(enqueueOwnerHealthCheck({
       installationId: '507f1f77bcf86cd799439011',
     })).rejects.toThrow('authenticated tenant owner context');
-    tenantId = undefined;
+    mockTenantId = undefined;
     await expect(enqueueOwnerHealthCheck({
       installationId: '507f1f77bcf86cd799439011',
     })).rejects.toThrow('authenticated tenant owner context');
