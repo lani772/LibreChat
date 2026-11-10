@@ -169,6 +169,34 @@ describe('ConnectorHealthJobWorker audit outbox delivery', () => {
     expect(mockModel.updateOne).not.toHaveBeenCalled();
   });
 
+  it('replays the same stable event ID if audit succeeds but outbox acknowledgement fails', async () => {
+    mockModel.findOne
+      .mockReturnValueOnce({
+        select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(pendingOutbox()) }) }),
+      })
+      .mockReturnValueOnce({
+        select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(pendingOutbox()) }) }),
+      })
+      .mockReturnValueOnce({
+        select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(null) }) }),
+      });
+    mockModel.updateOne
+      .mockReturnValueOnce({
+        exec: jest.fn().mockRejectedValue(new Error('ack write failed')),
+      })
+      .mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      });
+    const auditDb = { recordAuditEntry: jest.fn().mockResolvedValue({}) };
+
+    await expect(flushHealthJobAuditOutbox('job-1', auditDb)).rejects.toThrow('ack write failed');
+    await flushHealthJobAuditOutbox('job-1', auditDb);
+
+    expect(auditDb.recordAuditEntry).toHaveBeenCalledTimes(2);
+    expect(auditDb.recordAuditEntry.mock.calls[0][0].metadata.eventId).toBe('event-stable-1');
+    expect(auditDb.recordAuditEntry.mock.calls[1][0].metadata.eventId).toBe('event-stable-1');
+  });
+
   it('acknowledges an event only after successful audit delivery', async () => {
     mockModel.findOne
       .mockReturnValueOnce({
