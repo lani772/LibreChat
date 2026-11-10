@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   decryptConnectorCredential,
   type ConnectorCredentialEnvelope,
@@ -60,11 +61,7 @@ export async function processGoogleWorkspaceRevocationBatch(input: {
   const leaseMs = input.leaseMs ?? 60_000;
   const maxAttempts = input.maxAttempts ?? 12;
   const now = input.now ?? Date.now;
-  const newLeaseToken = input.newLeaseToken ?? (() => {
-    const bytes = new Uint8Array(16);
-    globalThis.crypto?.getRandomValues?.(bytes);
-    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
-  });
+  const newLeaseToken = input.newLeaseToken ?? randomUUID;
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 100 ||
       !Number.isInteger(leaseMs) || leaseMs < 5_000 || leaseMs > 120_000 ||
       !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 100) {
