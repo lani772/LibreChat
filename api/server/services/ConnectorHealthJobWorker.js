@@ -30,6 +30,7 @@ const retryPolicy = new ConnectorHealthRetryPolicy();
 let timer;
 let stopped = true;
 let running = false;
+const indexesReady = HealthJob.createIndexes();
 
 function trustedActiveKey(tenantId, ownerUserId, installationId) {
   return [tenantId, ownerUserId, installationId].join(':');
@@ -159,6 +160,7 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
     if (stopped || running) return;
     running = true;
     try {
+      await indexesReady;
       for (let count = 0; count < 10; count++) {
         const job = await runAsSystem(async () => claimJob());
         if (!job) break;
