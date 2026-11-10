@@ -6,7 +6,24 @@ import type {
   ConnectorRevocationState,
 } from '~/types/connectorRevocation';
 
+export interface ConnectorRevocationRotationRecord {
+  id: string;
+  tenantId: string;
+  installationId: string;
+  provider: 'google-workspace';
+  encryptedPayload: string;
+  updatedAt: Date;
+}
+
 export interface ConnectorRevocationMethods {
+  listConnectorRevocationsForRotation(input: { afterId?: string; limit: number }): Promise<ConnectorRevocationRotationRecord[]>;
+  replaceConnectorRevocationForRotation(input: {
+    id: string;
+    tenantId: string;
+    expectedEncryptedPayload: string;
+    expectedUpdatedAt: Date;
+    encryptedPayload: string;
+  }): Promise<boolean>;
   enqueueGoogleWorkspaceRevocation(input: {
     installationId: string;
     encryptedPayload: string;
@@ -45,6 +62,79 @@ export function createConnectorRevocationMethods(
 ): ConnectorRevocationMethods {
   const Revocation = mongoose.models.ConnectorRevocation as Model<ConnectorRevocationDocument>;
   const Installation = mongoose.models.ConnectorInstallation as Model<ConnectorInstallationDocument>;
+
+  async function listConnectorRevocationsForRotation(input: {
+    afterId?: string;
+    limit: number;
+  }): Promise<ConnectorRevocationRotationRecord[]> {
+    if (getTenantId() !== SYSTEM_TENANT_ID) {
+      throw new Error('Credential key rotation requires explicit system context');
+    }
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+      throw new Error('Credential rotation batch size must be between 1 and 100');
+    }
+    const filter: Record<string, unknown> = {
+      state: { $ne: 'complete' },
+      encryptedPayload: { $exists: true, $ne: null },
+      $or: [
+        { leaseUntil: { $exists: false } },
+        { leaseUntil: null },
+        { leaseUntil: { $lte: new Date() } },
+      ],
+    };
+    if (input.afterId) {
+      if (!mongoose.isValidObjectId(input.afterId)) throw new Error('Invalid revocation rotation cursor');
+      filter._id = { $gt: input.afterId };
+    }
+    const rows = await Revocation.find(filter)
+      .select('+encryptedPayload tenantId installationId provider updatedAt')
+      .sort({ _id: 1 })
+      .limit(input.limit)
+      .lean<ConnectorRevocationDocument[]>()
+      .exec();
+    return rows.filter((row) => typeof row.encryptedPayload === 'string').map((row) => ({
+      id: row._id.toString(),
+      tenantId: row.tenantId,
+      installationId: row.installationId,
+      provider: row.provider,
+      encryptedPayload: row.encryptedPayload!,
+      updatedAt: row.updatedAt,
+    }));
+  }
+
+  async function replaceConnectorRevocationForRotation(input: {
+    id: string;
+    tenantId: string;
+    expectedEncryptedPayload: string;
+    expectedUpdatedAt: Date;
+    encryptedPayload: string;
+  }): Promise<boolean> {
+    if (getTenantId() !== SYSTEM_TENANT_ID) {
+      throw new Error('Credential key rotation requires explicit system context');
+    }
+    if (!mongoose.isValidObjectId(input.id) || !input.tenantId ||
+        !input.expectedEncryptedPayload || !input.encryptedPayload ||
+        input.encryptedPayload.length > 140_000) {
+      throw new Error('Invalid revocation credential rotation update');
+    }
+    const result = await Revocation.updateOne(
+      {
+        _id: input.id,
+        tenantId: input.tenantId,
+        state: { $ne: 'complete' },
+        encryptedPayload: input.expectedEncryptedPayload,
+        updatedAt: input.expectedUpdatedAt,
+        $or: [
+          { leaseUntil: { $exists: false } },
+          { leaseUntil: null },
+          { leaseUntil: { $lte: new Date() } },
+        ],
+      },
+      { $set: { encryptedPayload: input.encryptedPayload } },
+      { runValidators: true },
+    ).exec();
+    return result.modifiedCount === 1;
+  }
 
   async function enqueueGoogleWorkspaceRevocation(input: {
     installationId: string;
@@ -203,6 +293,8 @@ export function createConnectorRevocationMethods(
   }
 
   return {
+    listConnectorRevocationsForRotation,
+    replaceConnectorRevocationForRotation,
     enqueueGoogleWorkspaceRevocation,
     claimGoogleWorkspaceRevocation,
     isConnectorInstallationRevokedForSystem,
