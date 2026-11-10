@@ -20,6 +20,7 @@ import {
   type ConnectorCredentialMethods,
 } from './connectorCredential';
 import { createGoogleOAuthStateMethods, type GoogleOAuthStateMethods } from './googleOAuthState';
+import { createConnectorRevocationMethods, type ConnectorRevocationMethods } from './connectorRevocation';
 import { createScheduleMCPConsentStorage } from './scheduleConsent';
 export { createScheduleMCPConsentStorage } from './scheduleConsent';
 export type { ScheduleMCPConsentStorage, ScheduleConsentSnapshot } from './scheduleConsent';
@@ -534,6 +535,7 @@ export function createMethods(
     ...createToolApprovalGrantMethods(mongoose),
     ...createConnectorInstallationMethods(mongoose),
     ...createConnectorCredentialMethods(mongoose),
+    ...createConnectorRevocationMethods(mongoose),
     ...createGoogleOAuthStateMethods(mongoose),
     ...createSessionMethods(mongoose),
     ...createTokenMethods(mongoose),
