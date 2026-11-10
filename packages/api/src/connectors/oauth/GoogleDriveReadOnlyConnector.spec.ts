@@ -42,6 +42,13 @@ describe('GoogleDriveReadOnlyConnector', () => {
     }));
   });
 
+  it('provides a minimal read-only health probe', async () => {
+    fetcher.mockResolvedValue(response(200, { files: [] }));
+    await expect(connector.checkHealth(INSTALLATION_ID)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+  });
+
   it('retrieves metadata for a safely encoded file ID', async () => {
     fetcher.mockResolvedValue(response(200, { id: 'a/b', name: 'Document' }));
     await expect(connector.getFile({ installationId: INSTALLATION_ID, fileId: 'a/b' }))
