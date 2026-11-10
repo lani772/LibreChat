@@ -172,3 +172,13 @@ Rotation procedure:
 5. Verify no stored credential envelopes reference a retired key, then remove that key from the keyring and retire it in the secret manager.
 
 Unknown key IDs, missing keys, malformed keyrings, and authentication-tag failures fail closed. The keyring is a deployment-managed key distribution mechanism, not a KMS/HSM integration: production deployments should source it from a KMS/HSM-backed secret manager and define an audited re-encryption job before retiring keys.
+
+
+## Tenant connector governance API
+
+The tenant administrator API is mounted at `/api/admin/connectors`:
+
+- `GET /installations` lists up to 100 connector installations in the active tenant.
+- `GET /audit?limit=50&cursor=<seq>` lists connector-targeted `mcp.tool_invoked` audit entries from that tenant's hash-chained audit partition.
+
+Both endpoints require JWT authentication and a fresh tenant-scoped user lookup whose role must be the built-in `ADMIN` role. Tenant and principal IDs are never accepted from query parameters or request bodies. The inventory response is an explicit safe projection: it includes owner ID, visibility, lifecycle state, grant count, MCP server binding, safe timestamps, and version; it omits credential references and individual grant IDs. The audit response is restricted in storage to connector targets and the `mcp.tool_invoked` action, then allowlists provider/reason metadata and omits request context and arbitrary metadata. Both responses use private no-store headers. This is a read-only governance surface: it does not let administrators take ownership of personal connectors or alter their grants.
