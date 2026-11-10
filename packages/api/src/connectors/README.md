@@ -300,7 +300,7 @@ Owners can inspect the bounded job projection at GET /api/connectors/google-work
 Unit tests cover the atomic expired-lease update shape, audit event creation, owner-bound replay filters, and lease renewal fencing. A MongoDB integration suite uses the repository's existing `mongodb-memory-server` development dependency to exercise competing claims, single-winner expired-lease recovery, fencing of stale renewals, tenant/owner-scoped active-job uniqueness, and rejection of a cross-tenant installation before a provider probe. Run it from the repository root with:
 
 ```bash
-npm run test --workspace api -- --runInBand api/server/services/ConnectorHealthJobWorker.integration.spec.js
+npm run test --workspace api -- --runInBand server/services/ConnectorHealthJobWorker.integration.spec.js
 ```
 
 The integration suite is authored but has not been executed in this environment. It exercises MongoDB atomicity with an ephemeral MongoDB process; it does not replace a deployment-level process-kill test or a live Google API test.
