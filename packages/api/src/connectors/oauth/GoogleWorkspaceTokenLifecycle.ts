@@ -28,6 +28,9 @@ function sleep(ms: number): Promise<void> {
 
 export interface GoogleWorkspaceTokenLifecycleDependencies {
   adapter: Pick<GoogleWorkspaceOAuthAdapter, 'refreshAccessToken' | 'revokeToken'>;
+  revocations: {
+    enqueueGoogleWorkspaceRevocation(input: { installationId: string; encryptedPayload: string }): Promise<{ id: string; state: string }>;
+  };
   vault: Pick<
     ConnectorCredentialVault,
     'withCredentials' | 'storeCredentials' | 'claimRefreshLease' | 'releaseRefreshLease'
@@ -157,7 +160,7 @@ export class GoogleWorkspaceTokenLifecycle {
   }> {
     let remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' = 'not_attempted';
     try {
-      await this.deps.vault.withCredentials(installationId, async (credentials) => {
+      await this.deps.vault.withCredentials(installationId, async (credentials, snapshot) => {
         const token =
           typeof credentials.refreshToken === 'string' && credentials.refreshToken.length > 0
             ? credentials.refreshToken
@@ -166,10 +169,21 @@ export class GoogleWorkspaceTokenLifecycle {
               : '';
         if (!token) return;
         try {
-          await this.deps.adapter.revokeToken({ token });
-          remoteRevocation = 'confirmed';
-        } catch {
+          // Persist the already-encrypted envelope before local cleanup. The outbox worker
+          // waits until the installation is revoked before sending the remote revoke request.
+          await this.deps.revocations.enqueueGoogleWorkspaceRevocation({
+            installationId,
+            encryptedPayload: snapshot.encryptedPayload,
+          });
           remoteRevocation = 'pending';
+        } catch {
+          // If durable enqueue is unavailable, retain best-effort immediate revocation.
+          try {
+            await this.deps.adapter.revokeToken({ token });
+            remoteRevocation = 'confirmed';
+          } catch {
+            remoteRevocation = 'pending';
+          }
         }
       });
     } catch {
