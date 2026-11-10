@@ -274,6 +274,16 @@ export default function GoogleWorkspaceConnections() {
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
+              {installation.state === 'connected' || installation.state === 'degraded' ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-text-primary underline disabled:opacity-50"
+                  disabled={busyId === installation.id}
+                  onClick={() => void checkHealth(installation.id)}
+                >
+                  {busyId === installation.id ? 'Checking…' : 'Check health'}
+                </button>
+              ) : null}
               {installation.state !== 'connected' && installation.state !== 'revoked' ? (
                 <button
                   type="button"
