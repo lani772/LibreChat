@@ -83,5 +83,6 @@ describe('ConnectorHealthMonitor', () => {
     const monitor = new ConnectorHealthMonitor(store, {});
     await expect(monitor.checkBatch(26)).rejects.toThrow('between 1 and 25');
     await expect(monitor.checkBatch(5)).resolves.toMatchObject({ checked: 0, healthy: 0 });
+    expect(store.listConnectorHealthCandidates).not.toHaveBeenCalled();
   });
 });
