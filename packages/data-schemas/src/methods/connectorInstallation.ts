@@ -275,7 +275,8 @@ export function createConnectorInstallationMethods(
     principalIds: string[];
   }): Promise<ConnectorInstallationDocument | null> {
     requireConnectorTenant('grant update');
-    if (!mongoose.isValidObjectId(params.installationId)) return null;
+    const principalId = getUserId();
+    if (!principalId || !mongoose.isValidObjectId(params.installationId)) return null;
     if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
       throw new Error('Invalid connector installation version');
     }
@@ -290,7 +291,9 @@ export function createConnectorInstallationMethods(
     return Model.findOneAndUpdate(
       {
         _id: params.installationId,
+        ownerUserId: principalId,
         visibility: 'personal',
+        state: { $ne: 'revoked' },
         version: params.expectedVersion,
       },
       { $set: { grantedPrincipalIds: principalIds }, $inc: { version: 1 } },
