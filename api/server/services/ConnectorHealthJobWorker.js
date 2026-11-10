@@ -39,6 +39,7 @@ const retryPolicy = new ConnectorHealthRetryPolicy();
 let timer;
 let stopped = true;
 let running = false;
+let activeTick;
 const indexesReady = HealthJob.createIndexes();
 
 function healthJobAuditEvent(action, outcome, severity, metadata) {
@@ -394,16 +395,25 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
       running = false;
     }
   };
-  timer = setInterval(() => void tick(), POLL_INTERVAL_MS);
+  const runTick = () => {
+    if (activeTick) return activeTick;
+    activeTick = tick().finally(() => {
+      activeTick = undefined;
+    });
+    return activeTick;
+  };
+  timer = setInterval(() => void runTick(), POLL_INTERVAL_MS);
   timer.unref?.();
-  void tick();
+  void runTick();
   return () => stopConnectorHealthJobWorker();
 }
 
-function stopConnectorHealthJobWorker() {
+/** Stop scheduling and wait for the current bounded worker tick to finish. */
+async function stopConnectorHealthJobWorker() {
   stopped = true;
   if (timer) clearInterval(timer);
   timer = undefined;
+  if (activeTick) await activeTick;
 }
 
 module.exports = {
