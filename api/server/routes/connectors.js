@@ -172,6 +172,61 @@ router.put(
   },
 );
 
+/**
+ * Searches only members in the authenticated tenant for the owner of a personal
+ * Google Workspace installation. The User model's tenant-isolation middleware
+ * scopes searchUsers; the route returns an explicit safe projection.
+ */
+router.get(
+  '/google-workspace/:installationId/members',
+  loginLimiter,
+  requireJwtAuth,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const tenantId = getTenantId();
+    const principalId = getUserId();
+    const { installationId } = req.params;
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId)) {
+      return res.status(404).json({ error: 'Connector installation is unavailable' });
+    }
+    if (query.length < 2 || query.length > 64 || /[\\u0000-\\u001f\\u007f]/.test(query)) {
+      return res.status(400).json({ error: 'Enter between 2 and 64 characters to search members' });
+    }
+    try {
+      const installation = await db.getConnectorInstallation(installationId);
+      if (
+        !installation ||
+        installation.tenantId !== tenantId ||
+        installation.ownerUserId !== principalId ||
+        installation.provider !== 'google-workspace' ||
+        installation.visibility !== 'personal' ||
+        installation.state === 'revoked'
+      ) {
+        return res.status(404).json({ error: 'Connector installation is unavailable' });
+      }
+
+      const members = await db.searchUsers({
+        searchPattern: query,
+        limit: 20,
+        fieldsToSelect: '_id name username email',
+      });
+      return res.status(200).json({
+        members: members
+          .filter((member) => member._id.toString() !== principalId)
+          .map((member) => ({
+            id: member._id.toString(),
+            name: member.name || null,
+            username: member.username || null,
+            email: member.email,
+          })),
+      });
+    } catch {
+      return res.status(503).json({ error: 'Tenant member search is temporarily unavailable' });
+    }
+  },
+);
+
 router.get(
   '/google-workspace/:installationId/status',
   loginLimiter,
