@@ -45,13 +45,13 @@ describe('ConnectorHealthJobWorker enqueue boundary', () => {
       installationId: '507f1f77bcf86cd799439011',
       provider: 'google-workspace',
       delayMs: 60_000,
-      mockTenantId: 'attacker-tenant',
+      tenantId: 'attacker-tenant',
       ownerUserId: 'attacker-user',
     });
     const [filter, update] = mockModel.findOneAndUpdate.mock.calls[0];
     expect(filter.activeKey).toBe('tenant-a:owner-a:507f1f77bcf86cd799439011');
     expect(update.$setOnInsert).toMatchObject({
-      mockTenantId: 'tenant-a',
+      tenantId: 'tenant-a',
       ownerUserId: 'owner-a',
       installationId: '507f1f77bcf86cd799439011',
       provider: 'google-workspace',
