@@ -117,6 +117,7 @@ describe('ConnectorHealthJobWorker owner visibility', () => {
       status: 'dead',
       attempt: 5,
       lastErrorCode: 'google_reauthorization_required',
+      reauthorizationRequired: true,
     });
     expect(jobs[0]).not.toHaveProperty('tenantId');
     expect(jobs[0]).not.toHaveProperty('ownerUserId');
