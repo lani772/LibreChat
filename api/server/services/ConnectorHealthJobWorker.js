@@ -369,6 +369,7 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
         await flushHealthJobAuditOutbox(pending._id, database).catch(() => undefined);
       }
       for (let count = 0; count < 10; count++) {
+        if (stopped) break;
         const job = await runAsSystem(async () => claimJob());
         if (!job) break;
         try {
