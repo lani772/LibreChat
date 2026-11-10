@@ -130,6 +130,21 @@ The built-in `google_drive` agent/assistant tool is registered through LibreChat
 Tests have been authored for installation list/create routes, Google Drive tool account selection, metadata lookup, and provider error redaction. They have not been executed in a dependency-enabled checkout.
 
 
+
+## Personal connector grant management
+
+The owner-only Google Workspace grant endpoint is:
+
+- `PUT /api/connectors/google-workspace/:installationId/grants`
+- Request: `{ "expectedVersion": 3, "principalIds": ["<tenant-user-object-id>"] }`
+- Response: installation ID, current granted principal IDs, and the incremented version.
+
+The route requires JWT authentication and same-origin validation. It derives tenant and owner identity from the trusted request context, checks that the installation is a personal Google Workspace installation owned by that principal, and resolves every proposed user through the existing tenant-isolated `findUsers` method before changing grants. IDs are bounded, validated as MongoDB ObjectId strings, deduplicated, and capped at 100. The owner cannot be redundantly added as a grantee. A stale version returns HTTP 409; unknown or cross-tenant user IDs are rejected without updating the installation.
+
+The persistence method independently enforces owner identity, personal visibility, non-revoked state, tenant partition, and expected version in the atomic update filter. This second boundary is intentional: route checks do not replace storage-level authorization. The owner-only installation list exposes the current grant IDs and version, but never credential references or provider tokens.
+
+The existing Google Workspace connection panel provides a basic grant editor using tenant user IDs. It does not provide a member directory or email-based lookup; operators must obtain the target user's internal ID through an approved tenant administration workflow. The provider operation still authorizes every invocation against current tenant membership and the current grant list, so removing a grant takes effect on the next authorized operation. No access is granted merely because a user knows an installation ID.
+
 ## Connector credential key rotation
 
 The AES-256-GCM envelope now supports a key ID while retaining decryption compatibility with existing `gcm1` envelopes that do not contain one.
