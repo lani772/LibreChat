@@ -17,7 +17,7 @@ function installation(overrides: Record<string, unknown> = {}) {
 describe('ConnectorHealthMonitor', () => {
   it('records a successful provider probe without exposing provider data', async () => {
     const recordConnectorHealth = jest.fn().mockResolvedValue({
-      ...installation(), version: 5, lastSuccessfulHealthCheckAt: new Date(),
+      ...installation(), healthVersion: 3, lastSuccessfulHealthCheckAt: new Date(),
     });
     const store = {
       getConnectorInstallation: jest.fn().mockResolvedValue(installation()),
@@ -39,7 +39,7 @@ describe('ConnectorHealthMonitor', () => {
 
   it('maps provider failures to safe codes and does not leak provider error messages', async () => {
     const recordConnectorHealth = jest.fn().mockResolvedValue({
-      ...installation(), version: 5, lastErrorCode: 'google-workspace_provider_unavailable',
+      ...installation(), healthVersion: 3, lastErrorCode: 'provider_unavailable',
       consecutiveHealthFailures: 1,
     });
     const store = {
