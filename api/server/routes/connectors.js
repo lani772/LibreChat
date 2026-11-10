@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
 const db = require('~/models');
+const { enqueueOwnerHealthCheck } = require('~/server/services/ConnectorHealthJobWorker');
 const { requireJwtAuth, requireSameOrigin, loginLimiter } = require('~/server/middleware');
 const {
   getGoogleWorkspaceOAuthFlow,
@@ -363,6 +364,11 @@ router.post(
       if (result.status === 'stale' || result.status === 'skipped') {
         return res.status(409).json({ error: 'Connector state changed; refresh and retry' });
       }
+      await enqueueOwnerHealthCheck({
+        installationId,
+        provider: 'google-workspace',
+        delayMs: result.status === 'healthy' ? 24 * 60 * 60_000 : 30_000,
+      });
       return res.status(200).json({
         installationId: result.installationId,
         healthy: result.status === 'healthy',
