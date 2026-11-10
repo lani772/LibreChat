@@ -27,6 +27,7 @@ const {
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
 const { startMCPAuthorizationFenceRetryWorker } = require('./MCPAuthorizationFenceRetry');
 const { startGoogleWorkspaceRevocationWorker } = require('./GoogleWorkspaceRevocationWorker');
+const { startConnectorHealthJobWorker } = require('./ConnectorHealthJobWorker');
 const {
   getMCPToolsCacheGeneration,
   renewMCPToolsCacheGeneration,
@@ -266,6 +267,11 @@ async function initializeMCPs() {
         );
         const stopGoogleRevocationWorker = startGoogleWorkspaceRevocationWorker(adapter);
         registerShutdownTask('Google Workspace revocation worker', stopGoogleRevocationWorker);
+        const stopConnectorHealthWorker = startConnectorHealthJobWorker({
+          monitor: connectorHealthMonitor,
+          db,
+        });
+        registerShutdownTask('Connector health job worker', stopConnectorHealthWorker);
       } catch {
         googleWorkspaceOAuthFlow = undefined;
         googleWorkspaceTokenLifecycle = undefined;
