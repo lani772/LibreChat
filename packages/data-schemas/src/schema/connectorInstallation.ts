@@ -24,6 +24,7 @@ const connectorInstallationSchema = new Schema<ConnectorInstallationDocument>(
     grantedPrincipalIds: { type: [String], default: [] },
     lastConnectedAt: { type: Date },
     lastErrorCode: { type: String, maxlength: 80 },
+    healthVersion: { type: Number, required: true, default: 0, min: 0 },
     consecutiveHealthFailures: { type: Number, required: true, default: 0, min: 0, max: 1000 },
     lastHealthCheckAt: { type: Date },
     lastSuccessfulHealthCheckAt: { type: Date },
