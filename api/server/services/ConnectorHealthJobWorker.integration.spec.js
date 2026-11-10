@@ -109,6 +109,39 @@ describe('ConnectorHealthJobWorker MongoDB concurrency integration', () => {
     })).resolves.toBe(false);
   });
 
+  it('delivers a durable audit event left behind by a crashed worker after restart', async () => {
+    const event = {
+      eventId: 'crash-recovery-event-1',
+      action: 'connector.health_job_retry_scheduled',
+      outcome: 'pending',
+      severity: 'warning',
+      metadata: { attempt: 3, source: 'worker_exception' },
+      createdAt: new Date(),
+    };
+    const job = await createPendingJob({
+      auditOutbox: [event],
+    });
+    // Simulate a new process/replica starting after the original worker exited
+    // without acknowledging its durable audit outbox record.
+    const auditDb = { recordAuditEntry: jest.fn().mockResolvedValue({}) };
+
+    await worker.flushHealthJobAuditOutbox(job._id, auditDb);
+
+    expect(auditDb.recordAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-a',
+        metadata: expect.objectContaining({
+          eventId: 'crash-recovery-event-1',
+          jobId: job._id.toString(),
+          attempt: 3,
+        }),
+      }),
+      { failClosed: true },
+    );
+    const persisted = await HealthJob.findById(job._id).lean();
+    expect(persisted.auditOutbox).toHaveLength(0);
+  });
+
   it('keeps active-job uniqueness partitioned by tenant and owner', async () => {
     await createPendingJob();
     await expect(createPendingJob()).rejects.toMatchObject({ code: 11000 });
