@@ -54,7 +54,7 @@ export type ConnectorAccessDecision =
  *
  * Tenant membership and connector visibility are checked independently:
  * being in a tenant does not automatically grant access to another member's
- * personal connector. Only a fully connected installation can execute tools.
+ * personal connector. Connected and degraded installations may execute tools; degraded is an operational health warning, not an authorization revocation.
  */
 export function authorizeConnectorInvocation(
   context: ConnectorAccessContext,
@@ -72,7 +72,7 @@ export function authorizeConnectorInvocation(
     return { allowed: false, reason: 'not_tenant_member' };
   }
 
-  if (installation.state !== 'connected') {
+  if (installation.state !== 'connected' && installation.state !== 'degraded') {
     return { allowed: false, reason: 'connector_not_connected' };
   }
 
