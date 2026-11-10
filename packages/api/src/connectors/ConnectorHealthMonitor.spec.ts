@@ -77,7 +77,7 @@ describe('ConnectorHealthMonitor', () => {
   it('bounds health batches', async () => {
     const store = {
       getConnectorInstallation: jest.fn(),
-      listConnectorInstallations: jest.fn().mockResolvedValue([]),
+      listConnectorHealthCandidates: jest.fn().mockResolvedValue([]),
       recordConnectorHealth: jest.fn(),
     };
     const monitor = new ConnectorHealthMonitor(store, {});
