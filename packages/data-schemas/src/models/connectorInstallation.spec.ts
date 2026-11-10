@@ -355,4 +355,94 @@ describe('connector installation persistence', () => {
       _resetStrictCache();
     }
   });
+
+  it('marks a connected installation degraded only after the configured consecutive failure threshold', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace',
+        displayName: 'Health monitored workspace',
+        visibility: 'personal',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().transitionConnectorInstallation({
+        installationId: String(created._id), expectedVersion: 0, state: 'authorizing',
+      }),
+    );
+    const connected = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().transitionConnectorInstallation({
+        installationId: String(created._id), expectedVersion: 1, state: 'connected',
+      }),
+    );
+    expect(connected?.state).toBe('connected');
+
+    const first = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(created._id), expectedVersion: 2,
+        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2,
+      }),
+    );
+    expect(first).toMatchObject({ state: 'connected', consecutiveHealthFailures: 1, version: 3 });
+
+    const second = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(created._id), expectedVersion: 3,
+        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 2,
+      }),
+    );
+    expect(second).toMatchObject({ state: 'degraded', consecutiveHealthFailures: 2, version: 4 });
+    expect(second?.lastErrorCode).toBe('google_provider_unavailable');
+  });
+
+  it('recovers a degraded installation after a successful health observation', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace', displayName: 'Recoverable workspace', visibility: 'personal',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().transitionConnectorInstallation({
+        installationId: String(created._id), expectedVersion: 0, state: 'authorizing',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().transitionConnectorInstallation({
+        installationId: String(created._id), expectedVersion: 1, state: 'connected',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(created._id), expectedVersion: 2,
+        outcome: 'unhealthy', errorCode: 'google_provider_unavailable', failureThreshold: 1,
+      }),
+    );
+    const recovered = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(created._id), expectedVersion: 3, outcome: 'healthy',
+      }),
+    );
+    expect(recovered).toMatchObject({
+      state: 'connected', consecutiveHealthFailures: 0, version: 4,
+    });
+    expect(recovered?.lastErrorCode).toBeNull();
+    expect(recovered?.lastSuccessfulHealthCheckAt).toBeInstanceOf(Date);
+  });
+
+  it('does not allow health probes to revive revoked installations or overwrite stale versions', async () => {
+    const created = await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().createConnectorInstallation({
+        provider: 'google-workspace', displayName: 'Revoked workspace', visibility: 'personal',
+      }),
+    );
+    await tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().revokeConnectorInstallation(String(created._id)),
+    );
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, async () =>
+      methods().recordConnectorHealth({
+        installationId: String(created._id), expectedVersion: 1, outcome: 'healthy',
+      }),
+    )).resolves.toBeNull();
+  });
+
+
 });
