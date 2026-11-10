@@ -259,3 +259,13 @@ metadata contains no provider response bodies, access tokens, refresh tokens, or
 references. Tenant administrators can inspect the same operational fields in the read-only
 connector governance inventory; this does not grant them access to personal connector
 credentials or the ability to trigger a probe on another user's behalf.
+
+
+
+## Health retry policy and worker contract
+
+`ConnectorHealthRetryPolicy` provides a pure, bounded retry decision for a future owner-scoped health job runner. Transient provider failures use equal-jitter exponential backoff (30 seconds by default, capped at 30 minutes) and stop after five attempts. Invalid Google grants are classified as `google_reauthorization_required` and are not retried; access denial and insufficient OAuth scope are also terminal decisions. Exhausted retries return a safe terminal code. The policy stores no job state and performs no scheduling itself.
+
+A production runner must persist the trusted tenant and principal alongside each job, use a durable lease/fencing mechanism to prevent concurrent or stale workers from applying results, and re-enter that exact tenant/principal context before listing or probing installations. It must re-check installation state and authorization at execution time. A global/system identity must never be used to probe personal connectors. This repository milestone does not claim that a recurring scheduler or durable health-job queue is wired; that integration remains blocked until a supported owner-context job execution contract is selected and tested.
+
+Focused policy tests cover jittered backoff, caps, attempt exhaustion, and terminal authentication/authorization failures. Tests are authored but not executed in a dependency-enabled checkout.
