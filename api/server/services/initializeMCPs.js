@@ -246,13 +246,13 @@ async function initializeMCPs() {
               db.revokeConnectorInstallation(installationId),
           },
         });
-        const stopGoogleRevocationWorker = startGoogleWorkspaceRevocationWorker(adapter);
-        registerShutdownTask('Google Workspace revocation worker', stopGoogleRevocationWorker);
         googleDriveReadOnlyConnector = new GoogleDriveReadOnlyConnector({
           connectors: connectorService,
           tokenLifecycle: googleWorkspaceTokenLifecycle,
           vault: connectorCredentialVault,
         });
+        const stopGoogleRevocationWorker = startGoogleWorkspaceRevocationWorker(adapter);
+        registerShutdownTask('Google Workspace revocation worker', stopGoogleRevocationWorker);
       } catch {
         googleWorkspaceOAuthFlow = undefined;
         googleWorkspaceTokenLifecycle = undefined;
