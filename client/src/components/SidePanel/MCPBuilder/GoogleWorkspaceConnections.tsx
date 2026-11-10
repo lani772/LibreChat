@@ -5,6 +5,9 @@ interface GoogleWorkspaceInstallation {
   displayName: string;
   state: string;
   lastConnectedAt?: string | null;
+  lastHealthCheckAt?: string | null;
+  lastSuccessfulHealthCheckAt?: string | null;
+  consecutiveHealthFailures?: number;
   lastErrorCode?: string | null;
   grantedPrincipalIds?: string[];
   version: number;
@@ -271,6 +274,11 @@ export default function GoogleWorkspaceConnections() {
               <p className="text-xs text-text-secondary">
                 {installation.state.replaceAll('_', ' ')}
                 {installation.lastErrorCode ? ` · ${installation.lastErrorCode}` : ''}
+              </p>
+              <p className="mt-1 text-xs text-text-secondary">
+                Last check: {installation.lastHealthCheckAt ? new Date(installation.lastHealthCheckAt).toLocaleString() : 'Not checked yet'}
+                {' · '}Last successful: {installation.lastSuccessfulHealthCheckAt ? new Date(installation.lastSuccessfulHealthCheckAt).toLocaleString() : 'None recorded'}
+                {' · '}Consecutive failures: {installation.consecutiveHealthFailures ?? 0}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
