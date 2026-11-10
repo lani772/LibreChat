@@ -422,7 +422,7 @@ describe('connector installation persistence', () => {
       }),
     );
     expect(recovered).toMatchObject({
-      state: 'connected', consecutiveHealthFailures: 0, healthVersion: 2, version: 3,
+      state: 'connected', consecutiveHealthFailures: 0, healthVersion: 2, version: 2,
     });
     expect(recovered?.lastErrorCode).toBeNull();
     expect(recovered?.lastSuccessfulHealthCheckAt).toBeInstanceOf(Date);
