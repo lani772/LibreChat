@@ -257,7 +257,12 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
       state: 'connected',
     });
-    db.findUsers.mockResolvedValue([]);
+    db.findUsers.mockResolvedValue([{
+      _id: { toString: () => '507f191e810c19729de860ec' },
+      name: 'Existing Grantee',
+      username: 'existing',
+      email: 'existing@example.test',
+    }]);
     db.searchUsers.mockResolvedValue([
       {
         _id: { toString: () => '507f191e810c19729de860eb' },
@@ -285,12 +290,20 @@ describe('Google Workspace connector routes', () => {
       limit: 20,
       fieldsToSelect: '_id name username email',
     });
-    expect(response.body.members).toEqual([{
-      id: '507f191e810c19729de860eb',
-      name: 'Member B',
-      username: 'memberb',
-      email: 'memberb@example.test',
-    }]);
+    expect(response.body.members).toEqual([
+      {
+        id: '507f191e810c19729de860ec',
+        name: 'Existing Grantee',
+        username: 'existing',
+        email: 'existing@example.test',
+      },
+      {
+        id: '507f191e810c19729de860eb',
+        name: 'Member B',
+        username: 'memberb',
+        email: 'memberb@example.test',
+      },
+    ]);
     expect(JSON.stringify(response.body)).not.toContain('must-not-leak');
   });
 
