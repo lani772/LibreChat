@@ -258,22 +258,28 @@ async function renewClaim(job) {
 async function withClaimLease(job, operation) {
   let leaseLost = false;
   let renewing = false;
-  const heartbeat = setInterval(async () => {
+  let renewalPromise = Promise.resolve();
+  const heartbeat = setInterval(() => {
     if (renewing || leaseLost) return;
     renewing = true;
-    try {
-      const renewed = await runAsSystem(() => renewClaim(job));
-      if (!renewed) leaseLost = true;
-    } catch {
-      // Uncertainty is treated as lost ownership; a successor can safely reclaim.
-      leaseLost = true;
-    } finally {
-      renewing = false;
-    }
+    renewalPromise = runAsSystem(() => renewClaim(job))
+      .then((renewed) => {
+        if (!renewed) leaseLost = true;
+      })
+      .catch(() => {
+        // Uncertainty is treated as lost ownership; a successor can safely reclaim.
+        leaseLost = true;
+      })
+      .finally(() => {
+        renewing = false;
+      });
   }, LEASE_RENEW_INTERVAL_MS);
   heartbeat.unref?.();
   try {
     const result = await operation();
+    clearInterval(heartbeat);
+    // Do not commit a probe result while a final heartbeat is unresolved.
+    await renewalPromise;
     return leaseLost ? { leaseLost: true } : { leaseLost: false, result };
   } finally {
     clearInterval(heartbeat);
