@@ -190,6 +190,20 @@ export function createConnectorRevocationMethods(
       throw new Error('Dead-letter retry requires explicit system context');
     }
     if (!mongoose.isValidObjectId(input.id)) return false;
+    const deadLetter = await Revocation.findOne({
+      _id: input.id,
+      state: 'dead',
+      encryptedPayload: { $exists: true, $ne: null },
+    }).select('tenantId installationId').lean<{ tenantId: string; installationId: string }>().exec();
+    if (!deadLetter) return false;
+    const installation = await Installation.findOne({
+      _id: deadLetter.installationId,
+      tenantId: deadLetter.tenantId,
+      provider: 'google-workspace',
+      state: 'revoked',
+    }).select('_id').lean<{ _id: unknown }>().exec();
+    if (!installation) return false;
+
     const result = await Revocation.updateOne(
       {
         _id: input.id,
