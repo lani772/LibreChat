@@ -10,6 +10,7 @@ import { createAgentTriggerDeliveryModel } from './triggerDelivery';
 import { createToolApprovalGrantModel } from './toolApprovalGrant';
 import { createConnectorInstallationModel } from './connectorInstallation';
 import { createConnectorCredentialModel } from './connectorCredential';
+import { createConnectorRevocationModel } from './connectorRevocation';
 import { createGoogleOAuthStateModel } from './googleOAuthState';
 import { createSkillUploadIntentModel } from './skillUploadIntent';
 import { createSubagentContentModel } from './subagentContent';
@@ -63,6 +64,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   ToolApprovalGrant: ReturnType<typeof createToolApprovalGrantModel>;
   ConnectorInstallation: ReturnType<typeof createConnectorInstallationModel>;
   ConnectorCredential: ReturnType<typeof createConnectorCredentialModel>;
+  ConnectorRevocation: ReturnType<typeof createConnectorRevocationModel>;
   GoogleOAuthState: ReturnType<typeof createGoogleOAuthStateModel>;
   Token: ReturnType<typeof createTokenModel>;
   Session: ReturnType<typeof createSessionModel>;
@@ -121,6 +123,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
     ToolApprovalGrant: createToolApprovalGrantModel(mongoose),
     ConnectorInstallation: createConnectorInstallationModel(mongoose),
     ConnectorCredential: createConnectorCredentialModel(mongoose),
+    ConnectorRevocation: createConnectorRevocationModel(mongoose),
     GoogleOAuthState: createGoogleOAuthStateModel(mongoose),
     Token: createTokenModel(mongoose),
     Session: createSessionModel(mongoose),
