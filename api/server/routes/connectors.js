@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { getTenantId, getUserId } = require('@librechat/data-schemas');
 const db = require('~/models');
-const { enqueueOwnerHealthCheck, listOwnerHealthJobs } = require('~/server/services/ConnectorHealthJobWorker');
+const { enqueueOwnerHealthCheck, listOwnerHealthJobs, retryOwnerDeadHealthJob } = require('~/server/services/ConnectorHealthJobWorker');
 const { requireJwtAuth, requireSameOrigin, loginLimiter } = require('~/server/middleware');
 const {
   getGoogleWorkspaceOAuthFlow,
@@ -361,6 +361,45 @@ router.get(
       return res.status(200).json({ jobs });
     } catch {
       return res.status(503).json({ error: 'Connector health job status is temporarily unavailable' });
+    }
+  },
+);
+
+/** Owner-only replay of a dead health job; no tenant or owner IDs are accepted from the client. */
+router.post(
+  '/google-workspace/:installationId/health-jobs/:jobId/retry',
+  loginLimiter,
+  requireJwtAuth,
+  requireSameOrigin,
+  async (req, res) => {
+    setNoStoreHeaders(res);
+    const tenantId = getTenantId();
+    const principalId = getUserId();
+    const { installationId, jobId } = req.params;
+    if (!tenantId || !principalId || !/^[a-f\\d]{24}$/i.test(installationId) || !/^[a-f\\d]{24}$/i.test(jobId)) {
+      return res.status(404).json({ error: 'Connector health job is unavailable' });
+    }
+    try {
+      const installation = await db.getConnectorInstallation(installationId);
+      if (
+        !installation ||
+        installation.tenantId !== tenantId ||
+        installation.ownerUserId !== principalId ||
+        installation.provider !== 'google-workspace'
+      ) {
+        return res.status(404).json({ error: 'Connector health job is unavailable' });
+      }
+      const job = await retryOwnerDeadHealthJob({ installationId, jobId });
+      if (!job) return res.status(404).json({ error: 'Dead connector health job is unavailable' });
+      return res.status(202).json({ job });
+    } catch (error) {
+      if (error?.message === 'An active health job already exists for this connector') {
+        return res.status(409).json({ error: 'A connector health check is already scheduled' });
+      }
+      if (error?.message === 'Invalid connector health job recovery target') {
+        return res.status(404).json({ error: 'Connector health job is unavailable' });
+      }
+      return res.status(503).json({ error: 'Connector health job recovery is temporarily unavailable' });
     }
   },
 );
