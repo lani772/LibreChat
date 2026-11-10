@@ -52,7 +52,7 @@ export interface ConnectorInstallationMethods {
   }): Promise<ConnectorInstallationDocument | null>;
   recordConnectorHealth(params: {
     installationId: string;
-    expectedVersion: number;
+    expectedHealthVersion: number;
     outcome: 'healthy' | 'unhealthy';
     errorCode?: string;
     failureThreshold?: number;
@@ -272,8 +272,8 @@ export function createConnectorInstallationMethods(
   }): Promise<ConnectorInstallationDocument | null> {
     requireConnectorTenant('health observation');
     if (!mongoose.isValidObjectId(params.installationId)) return null;
-    if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
-      throw new Error('Invalid connector installation version');
+    if (!Number.isInteger(params.expectedHealthVersion) || params.expectedHealthVersion < 0) {
+      throw new Error('Invalid connector health version');
     }
     const threshold = params.failureThreshold ?? 3;
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 10) {
@@ -288,10 +288,10 @@ export function createConnectorInstallationMethods(
     }
 
     const current = await Model.findById(params.installationId)
-      .select('state version consecutiveHealthFailures')
-      .lean<{ state: ConnectorInstallationState; version: number; consecutiveHealthFailures?: number }>()
+      .select('state healthVersion consecutiveHealthFailures')
+      .lean<{ state: ConnectorInstallationState; healthVersion: number; consecutiveHealthFailures?: number }>()
       .exec();
-    if (!current || current.version !== params.expectedVersion ||
+    if (!current || current.healthVersion !== params.expectedHealthVersion ||
         (current.state !== 'connected' && current.state !== 'degraded')) {
       return null;
     }
@@ -311,8 +311,8 @@ export function createConnectorInstallationMethods(
       ...(params.outcome === 'healthy' ? { lastSuccessfulHealthCheckAt: checkedAt } : {}),
     };
     return Model.findOneAndUpdate(
-      { _id: params.installationId, version: params.expectedVersion, state: current.state },
-      { $set: set, $inc: { version: 1 } },
+      { _id: params.installationId, healthVersion: params.expectedHealthVersion, state: current.state },
+      { $set: set, $inc: { healthVersion: 1 } },
       { new: true, runValidators: true },
     )
       .select('-credentialRef')
