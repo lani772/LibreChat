@@ -4,7 +4,9 @@ import {
 } from './credentialCrypto';
 
 describe('connector credential authenticated encryption', () => {
-  const originalKey = process.env.CONNECTOR_CREDENTIALS_KEY;\n  const originalKeyring = process.env.CONNECTOR_CREDENTIALS_KEYRING;\n  const originalActiveKeyId = process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
+  const originalKey = process.env.CONNECTOR_CREDENTIALS_KEY;
+  const originalKeyring = process.env.CONNECTOR_CREDENTIALS_KEYRING;
+  const originalActiveKeyId = process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
   const context = {
     tenantId: 'tenant-a',
     installationId: '64b000000000000000000001',
@@ -13,6 +15,8 @@ describe('connector credential authenticated encryption', () => {
 
   beforeEach(() => {
     process.env.CONNECTOR_CREDENTIALS_KEY = '11'.repeat(32);
+    delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
+    delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
     delete process.env.CONNECTOR_CREDENTIALS_KEYRING;
     delete process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID;
   });
@@ -110,7 +114,8 @@ describe('connector credential authenticated encryption', () => {
     expect(() => decryptConnectorCredential({ ...envelope, keyId: 'retired' }, context))
       .toThrow('encryption key is unavailable');
   });
-\n  it('rejects payloads larger than 64 KiB', () => {
+
+  it('rejects payloads larger than 64 KiB', () => {
     expect(() => encryptConnectorCredential('x'.repeat(65 * 1024), context)).toThrow('64 KiB');
   });
 });
