@@ -3,7 +3,7 @@ export interface ConnectorHealthRecord {
   provider: string;
   state: 'disconnected' | 'authorizing' | 'connected' | 'degraded' | 'revoked' | 'error';
   version: number;
-  healthVersion: number;
+  healthVersion?: number;
   consecutiveHealthFailures?: number;
   lastErrorCode?: string;
 }
@@ -97,7 +97,7 @@ export class ConnectorHealthMonitor {
 
     const updated = await this.store.recordConnectorHealth({
       installationId,
-      expectedHealthVersion: installation.healthVersion,
+      expectedHealthVersion: installation.healthVersion ?? 0,
       outcome,
       ...(errorCode ? { errorCode } : {}),
       failureThreshold: this.options.failureThreshold ?? 3,
