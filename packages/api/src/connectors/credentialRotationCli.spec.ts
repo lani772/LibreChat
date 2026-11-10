@@ -28,6 +28,8 @@ describe('connector credential rotation CLI', () => {
       store: {
         listConnectorCredentialsForRotation: jest.fn(async () => []),
         replaceConnectorCredentialForRotation: jest.fn(async () => true),
+        listConnectorRevocationsForRotation: jest.fn(async () => []),
+        replaceConnectorRevocationForRotation: jest.fn(async () => true),
       },
       write: (message: string) => output.push(message),
       writeError: (message: string) => errors.push(message),
@@ -61,13 +63,26 @@ describe('connector credential rotation CLI', () => {
     expect(JSON.parse(h.output[0]).dryRun).toBe(false);
   });
 
+  it('accepts an independent revocation-outbox resume cursor', async () => {
+    const h = harness();
+    const cursor = '64b000000000000000000002';
+    expect(
+      await runConnectorCredentialRotationCli([`--after-revocations=${cursor}`], h.deps),
+    ).toBe(0);
+    expect(h.deps.store.listConnectorRevocationsForRotation).toHaveBeenCalledWith({
+      afterId: cursor,
+      limit: 50,
+    });
+  });
+
   it('rejects invalid or conflicting flags before connecting', async () => {
     const h = harness();
     expect(await runConnectorCredentialRotationCli(['--apply', '--dry-run'], h.deps)).toBe(2);
     expect(await runConnectorCredentialRotationCli(['--batch-size=1000'], h.deps)).toBe(2);
     expect(await runConnectorCredentialRotationCli(['--after=bad'], h.deps)).toBe(2);
+    expect(await runConnectorCredentialRotationCli(['--after-revocations=bad'], h.deps)).toBe(2);
     expect(h.deps.connect).not.toHaveBeenCalled();
-    expect(h.errors).toHaveLength(3);
+    expect(h.errors).toHaveLength(4);
   });
 
   it('returns failure status for undecryptable rows and always disconnects', async () => {
