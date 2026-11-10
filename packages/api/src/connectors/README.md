@@ -187,3 +187,34 @@ Both endpoints require JWT authentication and a fresh tenant-scoped user lookup 
 ### Tenant connector governance dashboard
 
 Built-in tenant administrators can open the Connector governance section in the MCP Builder side panel. It consumes the read-only `/api/admin/connectors/installations` and `/api/admin/connectors/audit` endpoints. Inventory supports client-side search and connection-state filtering; audit history uses the audit store's descending sequence cursor to load older pages. The UI is intentionally read-only: personal connector ownership and sharing remain controlled by the connector owner through the existing grant workflow. The inventory endpoint is bounded to the latest 100 installations; audit pages are bounded to 50 entries in the UI (the API accepts 1–100). The dashboard does not display credential references, ciphertext, OAuth state, request context, or arbitrary audit metadata.
+
+
+## Immediate access revocation semantics
+
+Connector authorization is evaluated against current persisted state, not only when an MCP
+connection is created. The MCP authorization guard resolves the connector installation and
+re-runs the tenant membership and role-permission resolver at tool discovery/connection
+checkout and again at the tool-dispatch boundary. MCP App resource/tool proxy operations and
+App binding validation use the same guard. The permission resolver reads the principal's
+current tenant assignment and role from the active tenant partition on every check; it does
+not rely on a process-local role cache.
+
+Consequences:
+
+- Removing a user from the tenant (or deleting the tenant-scoped membership record) causes
+  subsequent guarded connector operations to fail closed.
+- Removing `MCP_SERVERS.INVOKE_CONNECTORS` from the user's current role blocks subsequent
+  tenant-shared connector operations, even if the MCP transport remains connected.
+- Removing a principal from a personal connector's grant list blocks their next operation.
+- Revoking or disconnecting the installation blocks subsequent guarded operations regardless
+  of cached MCP transport state.
+
+This is request-boundary enforcement, not cancellation of a provider request already dispatched
+upstream. A revocation racing after the final authorization check cannot retroactively cancel an
+in-flight Google API request. High-risk provider operations should therefore retain their own
+provider-side least-privilege scopes and bounded request timeouts. No claim of instantaneous
+cancellation of already-running requests is made.
+
+Regression coverage exercises changing membership and grant state between consecutive
+authorization checks, plus fresh role reads for permission revocation. These tests are authored
+but must be run in the repository's configured test environment before release.
