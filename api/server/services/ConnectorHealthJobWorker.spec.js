@@ -1,6 +1,7 @@
 const mockModel = {
   createIndexes: jest.fn().mockResolvedValue(undefined),
   findOneAndUpdate: jest.fn(() => ({ lean: () => ({ exec: jest.fn().mockResolvedValue({ _id: 'job-1' }) }) })),
+  updateOne: jest.fn(() => ({ exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }) })),
   findOne: jest.fn(() => ({
     select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(null) }) }),
     lean: () => ({ exec: jest.fn().mockResolvedValue(null) }),
@@ -37,7 +38,7 @@ jest.mock('@librechat/api', () => ({
   },
 }));
 
-const { claimJob, enqueueOwnerHealthCheck, listOwnerHealthJobs, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
+const { claimJob, enqueueOwnerHealthCheck, listOwnerHealthJobs, renewClaim, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
 
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
@@ -176,6 +177,42 @@ describe('ConnectorHealthJobWorker dead-job recovery', () => {
       jobId: '507f1f77bcf86cd799439012',
     })).rejects.toThrow('authenticated tenant owner context');
     expect(mockModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectorHealthJobWorker lease renewal', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
+  });
+
+  it('renews only the currently held lease token and fence', async () => {
+    const job = {
+      _id: 'job-1',
+      leaseToken: 'lease-token-a',
+      fence: 7,
+    };
+    await expect(renewClaim(job)).resolves.toBe(true);
+    const [filter, update] = mockModel.updateOne.mock.calls[0];
+    expect(filter).toEqual({
+      _id: 'job-1',
+      status: 'processing',
+      leaseToken: 'lease-token-a',
+      fence: 7,
+    });
+    expect(update.$set.leaseUntil).toBeInstanceOf(Date);
+  });
+
+  it('reports lease loss when another worker has already reclaimed the job', async () => {
+    mockModel.updateOne.mockReturnValueOnce({
+      exec: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+    });
+    await expect(renewClaim({
+      _id: 'job-1',
+      leaseToken: 'stale-token',
+      fence: 6,
+    })).resolves.toBe(false);
   });
 });
 
