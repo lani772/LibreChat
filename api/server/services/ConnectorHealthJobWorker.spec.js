@@ -38,7 +38,7 @@ jest.mock('@librechat/api', () => ({
   },
 }));
 
-const { claimJob, enqueueOwnerHealthCheck, listOwnerHealthJobs, renewClaim, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
+const { claimJob, enqueueOwnerHealthCheck, flushHealthJobAuditOutbox, listOwnerHealthJobs, renewClaim, retryOwnerDeadHealthJob } = require('./ConnectorHealthJobWorker');
 
 describe('ConnectorHealthJobWorker enqueue boundary', () => {
   beforeEach(() => {
@@ -133,6 +133,69 @@ describe('ConnectorHealthJobWorker owner visibility', () => {
     await expect(listOwnerHealthJobs({ installationId: '507f1f77bcf86cd799439011', limit: 1000 }))
       .rejects.toThrow('Invalid connector health job query');
     expect(mockModel.find).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectorHealthJobWorker audit outbox delivery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockTenantId = 'tenant-a';
+    mockUserId = 'owner-a';
+  });
+
+  const pendingOutbox = () => ({
+    _id: { toString: () => 'job-1' },
+    tenantId: 'tenant-a',
+    installationId: '507f1f77bcf86cd799439011',
+    provider: 'google-workspace',
+    auditOutbox: [{
+      eventId: 'event-stable-1',
+      action: 'connector.health_job_retry_scheduled',
+      outcome: 'pending',
+      severity: 'warning',
+      metadata: { attempt: 2 },
+      createdAt: new Date('2026-11-10T05:00:00.000Z'),
+    }],
+  });
+
+  it('retains the durable event when audit delivery fails', async () => {
+    mockModel.findOne.mockReturnValueOnce({
+      select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(pendingOutbox()) }) }),
+    });
+    const auditDb = { recordAuditEntry: jest.fn().mockRejectedValue(new Error('audit store unavailable')) };
+
+    await expect(flushHealthJobAuditOutbox('job-1', auditDb)).rejects.toThrow('audit store unavailable');
+    expect(auditDb.recordAuditEntry).toHaveBeenCalledTimes(1);
+    expect(mockModel.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges an event only after successful audit delivery', async () => {
+    mockModel.findOne
+      .mockReturnValueOnce({
+        select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(pendingOutbox()) }) }),
+      })
+      .mockReturnValueOnce({
+        select: () => ({ lean: () => ({ exec: jest.fn().mockResolvedValue(null) }) }),
+      });
+    const auditDb = { recordAuditEntry: jest.fn().mockResolvedValue({}) };
+
+    await flushHealthJobAuditOutbox('job-1', auditDb);
+
+    expect(auditDb.recordAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-a',
+        metadata: expect.objectContaining({
+          eventId: 'event-stable-1',
+          jobId: 'job-1',
+          attempt: 2,
+        }),
+      }),
+      { failClosed: true },
+    );
+    expect(mockModel.updateOne).toHaveBeenCalledWith(
+      { _id: 'job-1', 'auditOutbox.eventId': 'event-stable-1' },
+      { $pull: { auditOutbox: { eventId: 'event-stable-1' } } },
+    );
   });
 });
 
