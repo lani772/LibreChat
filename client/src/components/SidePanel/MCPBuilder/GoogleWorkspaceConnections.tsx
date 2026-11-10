@@ -17,6 +17,21 @@ interface InstallationsResponse {
   installations: GoogleWorkspaceInstallation[];
 }
 
+interface GoogleWorkspaceHealthJob {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'dead';
+  attempt: number;
+  nextAttemptAt: string;
+  lastErrorCode: string | null;
+  reauthorizationRequired: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface HealthJobsResponse {
+  jobs: GoogleWorkspaceHealthJob[];
+}
+
 interface TenantMember {
   id: string;
   name: string | null;
@@ -41,6 +56,8 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export default function GoogleWorkspaceConnections() {
   const [installations, setInstallations] = useState<GoogleWorkspaceInstallation[]>([]);
+  const [healthJobs, setHealthJobs] = useState<Record<string, GoogleWorkspaceHealthJob[]>>({});
+  const [healthJobsBusyId, setHealthJobsBusyId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState('Google Workspace');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -62,6 +79,20 @@ export default function GoogleWorkspaceConnections() {
       });
       const data = await readJson<InstallationsResponse>(response);
       setInstallations(data.installations);
+      const jobEntries = await Promise.all(data.installations.map(async (installation) => {
+        try {
+          const jobsResponse = await fetch(
+            `/api/connectors/google-workspace/${encodeURIComponent(installation.id)}/health-jobs`,
+            { credentials: 'include', headers: { Accept: 'application/json' }, cache: 'no-store' },
+          );
+          const jobsData = await readJson<HealthJobsResponse>(jobsResponse);
+          return [installation.id, jobsData.jobs] as const;
+        } catch {
+          // A health-job visibility failure must not hide the installation itself.
+          return [installation.id, []] as const;
+        }
+      }));
+      setHealthJobs(Object.fromEntries(jobEntries));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load Google Workspace connections.');
@@ -211,6 +242,30 @@ export default function GoogleWorkspaceConnections() {
     }
   };
 
+  const retryDeadHealthJob = async (installationId: string, jobId: string) => {
+    setHealthJobsBusyId(installationId);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(
+        `/api/connectors/google-workspace/${encodeURIComponent(installationId)}/health-jobs/${encodeURIComponent(jobId)}/retry`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        },
+      );
+      await readJson<{ job: { id: string; status: string } }>(response);
+      setMessage('Health check recovery has been scheduled.');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to recover the health check.');
+      await refresh();
+    } finally {
+      setHealthJobsBusyId(null);
+    }
+  };
+
   const disconnect = async (installationId: string) => {
     setBusyId(installationId);
     setError(null);
@@ -313,6 +368,36 @@ export default function GoogleWorkspaceConnections() {
                 </button>
               ) : null}
             </div>
+            {(healthJobs[installation.id] ?? []).length > 0 ? (
+              <div className="w-full rounded-md border border-border-medium p-2" aria-label={`Health job status for ${installation.displayName}`}>
+                <p className="mb-1 text-xs font-medium text-text-secondary">Background health checks</p>
+                <ul className="space-y-1">
+                  {(healthJobs[installation.id] ?? []).map((job) => (
+                    <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-text-secondary">
+                        <span className="font-medium text-text-primary">{job.status.replaceAll('_', ' ')}</span>
+                        {' · '}Attempt {job.attempt}
+                        {job.status === 'pending' ? ` · Next: ${new Date(job.nextAttemptAt).toLocaleString()}` : ''}
+                        {job.lastErrorCode ? ` · ${job.lastErrorCode}` : ''}
+                      </span>
+                      {job.reauthorizationRequired ? (
+                        <span role="status" className="text-amber-600">Reconnect Google to resume checks</span>
+                      ) : null}
+                      {job.status === 'dead' && ['connected', 'degraded'].includes(installation.state) ? (
+                        <button
+                          type="button"
+                          className="font-medium text-text-primary underline disabled:opacity-50"
+                          disabled={healthJobsBusyId === installation.id}
+                          onClick={() => void retryDeadHealthJob(installation.id, job.id)}
+                        >
+                          {healthJobsBusyId === installation.id ? 'Scheduling…' : 'Retry'}
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {installation.state !== 'revoked' ? (
               <div className="mt-2 w-full rounded-md border border-border-medium p-2">
                 <label className="mb-1 block text-xs font-medium text-text-secondary" htmlFor={`connector-member-search-${installation.id}`}>
