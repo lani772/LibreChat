@@ -50,6 +50,14 @@ export interface ConnectorInstallationMethods {
     state: ConnectorInstallationState;
     lastErrorCode?: string;
   }): Promise<ConnectorInstallationDocument | null>;
+  recordConnectorHealth(params: {
+    installationId: string;
+    expectedVersion: number;
+    outcome: 'healthy' | 'unhealthy';
+    errorCode?: string;
+    failureThreshold?: number;
+    checkedAt?: Date;
+  }): Promise<ConnectorInstallationDocument | null>;
   revokeConnectorInstallation(installationId: string): Promise<boolean>;
   updateConnectorInstallationGrants(params: {
     installationId: string;
@@ -250,6 +258,68 @@ export function createConnectorInstallationMethods(
       .exec();
   }
 
+  /**
+   * Persist a health observation with optimistic concurrency. Health probes never
+   * resurrect disconnected, errored, or revoked installations.
+   */
+  async function recordConnectorHealth(params: {
+    installationId: string;
+    expectedVersion: number;
+    outcome: 'healthy' | 'unhealthy';
+    errorCode?: string;
+    failureThreshold?: number;
+    checkedAt?: Date;
+  }): Promise<ConnectorInstallationDocument | null> {
+    requireConnectorTenant('health observation');
+    if (!mongoose.isValidObjectId(params.installationId)) return null;
+    if (!Number.isInteger(params.expectedVersion) || params.expectedVersion < 0) {
+      throw new Error('Invalid connector installation version');
+    }
+    const threshold = params.failureThreshold ?? 3;
+    if (!Number.isInteger(threshold) || threshold < 1 || threshold > 10) {
+      throw new Error('Connector health failure threshold must be between 1 and 10');
+    }
+    if (params.outcome !== 'healthy' && params.outcome !== 'unhealthy') {
+      throw new Error('Invalid connector health outcome');
+    }
+    if (params.outcome === 'unhealthy' &&
+        (typeof params.errorCode !== 'string' || !ERROR_CODE_PATTERN.test(params.errorCode))) {
+      throw new Error('A safe connector health error code is required');
+    }
+
+    const current = await Model.findById(params.installationId)
+      .select('state version consecutiveHealthFailures')
+      .lean<{ state: ConnectorInstallationState; version: number; consecutiveHealthFailures?: number }>()
+      .exec();
+    if (!current || current.version !== params.expectedVersion ||
+        (current.state !== 'connected' && current.state !== 'degraded')) {
+      return null;
+    }
+
+    const checkedAt = params.checkedAt ?? new Date();
+    const failures = params.outcome === 'healthy'
+      ? 0
+      : Math.min((current.consecutiveHealthFailures ?? 0) + 1, 1000);
+    const nextState: ConnectorInstallationState =
+      params.outcome === 'healthy' ? 'connected'
+        : failures >= threshold ? 'degraded' : current.state;
+    const set: Record<string, unknown> = {
+      lastHealthCheckAt: checkedAt,
+      consecutiveHealthFailures: failures,
+      state: nextState,
+      lastErrorCode: params.outcome === 'healthy' ? null : params.errorCode,
+      ...(params.outcome === 'healthy' ? { lastSuccessfulHealthCheckAt: checkedAt } : {}),
+    };
+    return Model.findOneAndUpdate(
+      { _id: params.installationId, version: params.expectedVersion, state: current.state },
+      { $set: set, $inc: { version: 1 } },
+      { new: true, runValidators: true },
+    )
+      .select('-credentialRef')
+      .lean<ConnectorInstallationDocument>()
+      .exec();
+  }
+
   async function revokeConnectorInstallation(installationId: string): Promise<boolean> {
     requireConnectorTenant('revoke');
     if (!mongoose.isValidObjectId(installationId)) return false;
@@ -312,6 +382,7 @@ export function createConnectorInstallationMethods(
     bindConnectorInstallationToMCPServer,
     listConnectorInstallations,
     transitionConnectorInstallation,
+    recordConnectorHealth,
     revokeConnectorInstallation,
     updateConnectorInstallationGrants,
   };
