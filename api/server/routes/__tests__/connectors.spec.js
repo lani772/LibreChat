@@ -257,6 +257,7 @@ describe('Google Workspace connector routes', () => {
       visibility: 'personal',
       state: 'connected',
     });
+    db.findUsers.mockResolvedValue([]);
     db.searchUsers.mockResolvedValue([
       {
         _id: { toString: () => '507f191e810c19729de860eb' },
