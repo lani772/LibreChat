@@ -287,6 +287,7 @@ export type AllMethods = SubagentContentMethods &
   ToolApprovalGrantStorage &
   ConnectorInstallationMethods &
   ConnectorCredentialMethods &
+  ConnectorRevocationMethods &
   GoogleOAuthStateMethods &
   UserMethods &
   SessionMethods &
