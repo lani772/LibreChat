@@ -269,3 +269,16 @@ credentials or the ability to trigger a probe on another user's behalf.
 A production runner must persist the trusted tenant and principal alongside each job, use a durable lease/fencing mechanism to prevent concurrent or stale workers from applying results, and re-enter that exact tenant/principal context before listing or probing installations. It must re-check installation state and authorization at execution time. A global/system identity must never be used to probe personal connectors. This repository milestone does not claim that a recurring scheduler or durable health-job queue is wired; that integration remains blocked until a supported owner-context job execution contract is selected and tested.
 
 Focused policy tests cover jittered backoff, caps, attempt exhaustion, and terminal authentication/authorization failures. Tests are authored but not executed in a dependency-enabled checkout.
+
+
+## Owner-scoped durable health jobs
+
+The API server's `ConnectorHealthJobWorker` persists health work in the `connectorhealthjobs` MongoDB collection. The owner-triggered health-check endpoint schedules the next check after its immediate probe: healthy installations are checked again after 24 hours; unhealthy observations enter the bounded retry policy. A unique active-job key deduplicates pending/processing work for the same tenant, owner, and installation.
+
+The worker claims due jobs in explicit system context only to read and lease queue records. Each claimed job carries the tenant and owner captured from trusted request context at enqueue time. Before probing, the worker re-enters that exact `tenantStorage` identity, reloads the installation through the tenant-isolated data method, and verifies tenant, owner, provider, and eligible lifecycle state. It never uses system context for connector installation reads or provider probes.
+
+Claims use a 60-second lease, random lease token, and monotonically incremented fencing value. Completion/rescheduling updates compare the lease token and fence, so a worker whose lease expired cannot overwrite a newer worker's decision. The worker processes at most ten jobs per tick, polls every ten seconds, and registers a shutdown task. Successful probes schedule the next daily check; transient failures use the bounded jittered retry policy; exhausted or non-actionable jobs become terminal. Reauthorization errors are not retried by the retry policy, and the token lifecycle remains responsible for marking invalid grants as requiring reauthorization.
+
+The durable worker is started only when Google Workspace connector configuration initializes successfully. Jobs are enqueued by the authenticated owner health-check route; the worker does not enumerate all tenants or discover personal connectors globally. A newly connected installation receives recurring checks after its owner performs the first health check. A future onboarding improvement may enqueue the first job as part of the successful OAuth callback.
+
+Focused tests cover trusted owner-context capture, rejection of system/missing identity, malformed installation IDs, and unsupported providers. The worker uses MongoDB persistence and distributed lease/fencing semantics; full multi-process integration, crash/recovery, and real provider tests still need to be executed in a dependency-enabled environment.
