@@ -1,5 +1,6 @@
 jest.mock('@librechat/data-schemas', () => ({
   getUserId: jest.fn(() => 'user-a'),
+  getTenantId: jest.fn(() => 'tenant-a'),
 }));
 
 jest.mock('~/models', () => ({
@@ -10,7 +11,7 @@ jest.mock('~/server/services/initializeMCPs', () => ({
   getGoogleDriveReadOnlyConnector: jest.fn(),
 }));
 
-const { getUserId } = require('@librechat/data-schemas');
+const { getUserId, getTenantId } = require('@librechat/data-schemas');
 const db = require('~/models');
 const { getGoogleDriveReadOnlyConnector } = require('~/server/services/initializeMCPs');
 const GoogleDrive = require('./GoogleDrive');
@@ -24,7 +25,26 @@ describe('Google Drive agent tool', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getUserId.mockReturnValue('user-a');
+    getTenantId.mockReturnValue('tenant-a');
     getGoogleDriveReadOnlyConnector.mockReturnValue(drive);
+  });
+
+  it('fails closed when trusted tenant context is missing', async () => {
+    getTenantId.mockReturnValue(undefined);
+    await expect(new GoogleDrive()._call({ action: 'search_files' })).resolves.toContain(
+      'Google Drive could not complete',
+    );
+    expect(db.listConnectorInstallations).not.toHaveBeenCalled();
+    expect(drive.listFiles).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when authenticated principal is missing', async () => {
+    getUserId.mockReturnValue(undefined);
+    await expect(new GoogleDrive()._call({ action: 'search_files' })).resolves.toContain(
+      'Google Drive could not complete',
+    );
+    expect(db.listConnectorInstallations).not.toHaveBeenCalled();
+    expect(drive.listFiles).not.toHaveBeenCalled();
   });
 
   it('uses the only connected account owned by the trusted principal', async () => {
