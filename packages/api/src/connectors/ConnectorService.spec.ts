@@ -175,4 +175,56 @@ describe('ConnectorService', () => {
       service.authorize('installation-id'),
     )).rejects.toBeInstanceOf(ConnectorAccessError);
   });
+
+  it('rechecks tenant membership for every authorization on an already active MCP connection', async () => {
+    let isTenantMember = true;
+    const getConnectorInstallation = jest.fn().mockResolvedValue(installation());
+    const resolvePrincipalPermissions = jest.fn().mockImplementation(async () => ({
+      isTenantMember,
+      canInvokeTenantConnector: true,
+    }));
+    const service = new ConnectorService({
+      installations: { getConnectorInstallation },
+      resolvePrincipalPermissions,
+      audit: jest.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      service.authorize('installation-id'),
+    )).resolves.toMatchObject({ principalId: 'user-a' });
+
+    // Simulates removal from the tenant while the MCP transport remains connected.
+    isTenantMember = false;
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-a' }, () =>
+      service.authorize('installation-id'),
+    )).rejects.toBeInstanceOf(ConnectorAccessError);
+    expect(resolvePrincipalPermissions).toHaveBeenCalledTimes(2);
+    expect(getConnectorInstallation).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-reads personal connector grants and denies the next call after a grant is removed', async () => {
+    let grantedPrincipalIds = ['user-b'];
+    const getConnectorInstallation = jest.fn().mockImplementation(async () =>
+      installation({ ownerUserId: 'user-a', grantedPrincipalIds }),
+    );
+    const service = new ConnectorService({
+      installations: { getConnectorInstallation },
+      resolvePrincipalPermissions: jest.fn().mockResolvedValue({
+        isTenantMember: true,
+        canInvokeTenantConnector: false,
+      }),
+      audit: jest.fn().mockResolvedValue(undefined),
+    });
+
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-b' }, () =>
+      service.authorize('installation-id'),
+    )).resolves.toMatchObject({ principalId: 'user-b' });
+
+    grantedPrincipalIds = [];
+    await expect(tenantStorage.run({ tenantId: 'tenant-a', userId: 'user-b' }, () =>
+      service.authorize('installation-id'),
+    )).rejects.toBeInstanceOf(ConnectorAccessError);
+    expect(getConnectorInstallation).toHaveBeenCalledTimes(2);
+  });
+
 });
