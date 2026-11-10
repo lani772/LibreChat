@@ -50,6 +50,8 @@ export interface GoogleWorkspaceOAuthFlowDependencies {
   };
   /** Re-establishes the trusted tenant/principal AsyncLocalStorage context captured at start. */
   runWithIdentity<TResult>(identity: GoogleOAuthIdentity, operation: () => Promise<TResult>): Promise<TResult>;
+  /** Best-effort durable scheduling after credentials and connected state are committed. */
+  onConnected?(input: { installationId: string }): Promise<void>;
   clientId: string;
   redirectUri: string;
   scopes: string[];
@@ -163,7 +165,7 @@ export class GoogleWorkspaceOAuthFlow {
     }
     const identity = { tenantId: pending.tenantId, principalId: pending.principalId };
     try {
-      return await this.deps.runWithIdentity(identity, async () => {
+      const result = await this.deps.runWithIdentity(identity, async () => {
         const installation = await this.deps.installations.getConnectorInstallation(pending.installationId);
         if (
           !installation ||
@@ -196,6 +198,12 @@ export class GoogleWorkspaceOAuthFlow {
         }
         return { installationId: pending.installationId, connected: true as const };
       });
+      try {
+        await this.deps.onConnected?.({ installationId: pending.installationId });
+      } catch {
+        // The connection is already committed. A queue outage must not mark valid credentials as an OAuth failure.
+      }
+      return result;
     } catch (error) {
       await this.deps.runWithIdentity(identity, async () => {
         const current = await this.deps.installations.getConnectorInstallation(pending.installationId);
