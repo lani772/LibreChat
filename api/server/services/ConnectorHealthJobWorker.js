@@ -21,6 +21,14 @@ const schema = new mongoose.Schema({
   fence: { type: Number, required: true, default: 0 },
   activeKey: { type: String },
   lastErrorCode: { type: String, maxlength: 80 },
+  auditOutbox: [{
+    eventId: { type: String, required: true },
+    action: { type: String, required: true },
+    outcome: { type: String, required: true },
+    severity: { type: String, required: true },
+    metadata: { type: mongoose.Schema.Types.Mixed, required: true },
+    createdAt: { type: Date, required: true },
+  }],
 }, { timestamps: true, strict: 'throw', collection: COLLECTION });
 schema.index({ activeKey: 1 }, { unique: true, partialFilterExpression: { activeKey: { $type: 'string' } } });
 schema.index({ status: 1, nextAttemptAt: 1, leaseUntil: 1 });
@@ -31,6 +39,49 @@ let timer;
 let stopped = true;
 let running = false;
 const indexesReady = HealthJob.createIndexes();
+
+function healthJobAuditEvent(action, outcome, severity, metadata) {
+  return {
+    eventId: randomUUID(),
+    action,
+    outcome,
+    severity,
+    metadata,
+    createdAt: new Date(),
+  };
+}
+
+/**
+ * The job document is the durable outbox. Append the event in the same atomic
+ * state transition, then deliver it to the existing hash-chained tenant audit
+ * log. Delivery is at-least-once across a crash between append and outbox ack.
+ */
+async function flushHealthJobAuditOutbox(jobId, auditDb) {
+  const pending = await HealthJob.findOne({ _id: jobId, 'auditOutbox.0': { $exists: true } })
+    .select('tenantId ownerUserId installationId provider auditOutbox')
+    .lean()
+    .exec();
+  if (!pending) return;
+  const event = pending.auditOutbox[0];
+  await auditDb.recordAuditEntry({
+    action: event.action,
+    outcome: event.outcome,
+    severity: event.severity,
+    actor: { type: 'service', name: 'connector-health-worker' },
+    target: { type: 'connector', id: pending.installationId, name: 'Google Workspace' },
+    tenantId: pending.tenantId,
+    metadata: {
+      ...event.metadata,
+      provider: pending.provider,
+      eventId: event.eventId,
+      jobId: pending._id.toString(),
+    },
+  }, { failClosed: true });
+  await HealthJob.updateOne(
+    { _id: jobId, 'auditOutbox.eventId': event.eventId },
+    { $pull: { auditOutbox: { eventId: event.eventId } } },
+  ).exec();
+}
 
 function trustedActiveKey(tenantId, ownerUserId, installationId) {
   return [tenantId, ownerUserId, installationId].join(':');
@@ -53,15 +104,18 @@ async function enqueueOwnerHealthCheck({ installationId, provider = 'google-work
   const activeKey = trustedActiveKey(tenantId, ownerUserId, installationId);
   const now = new Date();
   try {
-    return await HealthJob.findOneAndUpdate(
+    const job = await HealthJob.findOneAndUpdate(
       { activeKey },
       { $setOnInsert: {
         tenantId, ownerUserId, installationId, provider, status: 'pending',
         attempt: 0, nextAttemptAt: new Date(now.getTime() + Math.max(0, delayMs)),
         fence: 0, activeKey,
+        auditOutbox: [healthJobAuditEvent('connector.health_job_scheduled', 'pending', 'info', { delayMs })],
       } },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean().exec();
+    await flushHealthJobAuditOutbox(job._id, require('~/models'));
+    return job;
   } catch (error) {
     if (error?.code !== 11000) throw error;
     return HealthJob.findOne({ activeKey }).lean().exec();
@@ -168,8 +222,10 @@ async function processClaim(job, monitor, db) {
     if (!decision.retry) {
       await updateClaim(job, {
         $set: { status: 'dead', attempt: nextAttempt, lastErrorCode: decision.errorCode },
+        $push: { auditOutbox: healthJobAuditEvent('connector.health_job_dead_lettered', 'failure', 'critical', { attempt: nextAttempt, errorCode: decision.errorCode, fence: job.fence }) },
         $unset: { activeKey: 1, leaseToken: 1, leaseUntil: 1 },
       });
+      await flushHealthJobAuditOutbox(job._id, db);
       return;
     }
     await updateClaim(job, {
@@ -179,8 +235,10 @@ async function processClaim(job, monitor, db) {
         nextAttemptAt: decision.nextAttemptAt,
         lastErrorCode: decision.errorCode,
       },
+      $push: { auditOutbox: healthJobAuditEvent('connector.health_job_retry_scheduled', 'pending', 'warning', { attempt: nextAttempt, errorCode: decision.errorCode, nextAttemptAt: decision.nextAttemptAt.toISOString(), fence: job.fence }) },
       $unset: { leaseToken: 1, leaseUntil: 1 },
     });
+    await flushHealthJobAuditOutbox(job._id, db);
   });
 }
 
@@ -206,8 +264,10 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
             $unset: { leaseToken: 1, leaseUntil: 1 },
           } : {
             $set: { status: 'dead', attempt: nextAttempt, lastErrorCode: decision.errorCode },
+            $push: { auditOutbox: healthJobAuditEvent('connector.health_job_dead_lettered', 'failure', 'critical', { attempt: nextAttempt, errorCode: decision.errorCode, fence: job.fence }) },
             $unset: { activeKey: 1, leaseToken: 1, leaseUntil: 1 },
           })).catch(() => false);
+          await flushHealthJobAuditOutbox(job._id, database).catch(() => undefined);
         }
       }
     } catch {
