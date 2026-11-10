@@ -82,7 +82,13 @@ router.get('/audit', loginLimiter, requireJwtAuth, requireTenantAdmin, async (re
   }
   try {
     const page = await db.listAuditLogPage(tenantId, {
-      action: ['mcp.tool_invoked'],
+      action: [
+        'mcp.tool_invoked',
+        'connector.health_job_scheduled',
+        'connector.health_job_retry_scheduled',
+        'connector.health_job_lease_recovered',
+        'connector.health_job_dead_lettered',
+      ],
       targetType: 'connector',
       limit: rawLimit,
       ...(rawCursor !== undefined ? { cursor: rawCursor } : {}),
@@ -107,6 +113,11 @@ router.get('/audit', loginLimiter, requireJwtAuth, requireTenantAdmin, async (re
         metadata: {
           provider: typeof entry.metadata?.provider === 'string' ? entry.metadata.provider : null,
           reason: typeof entry.metadata?.reason === 'string' ? entry.metadata.reason : null,
+          eventId: typeof entry.metadata?.eventId === 'string' ? entry.metadata.eventId : null,
+          jobId: typeof entry.metadata?.jobId === 'string' ? entry.metadata.jobId : null,
+          errorCode: typeof entry.metadata?.errorCode === 'string' ? entry.metadata.errorCode : null,
+          attempt: Number.isInteger(entry.metadata?.attempt) ? entry.metadata.attempt : null,
+          nextAttemptAt: typeof entry.metadata?.nextAttemptAt === 'string' ? entry.metadata.nextAttemptAt : null,
         },
         integrity: entry.integrity,
       })),
