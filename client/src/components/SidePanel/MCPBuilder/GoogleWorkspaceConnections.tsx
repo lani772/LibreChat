@@ -6,6 +6,8 @@ interface GoogleWorkspaceInstallation {
   state: string;
   lastConnectedAt?: string | null;
   lastErrorCode?: string | null;
+  grantedPrincipalIds?: string[];
+  version: number;
 }
 
 interface InstallationsResponse {
@@ -26,6 +28,7 @@ export default function GoogleWorkspaceConnections() {
   const [displayName, setDisplayName] = useState('Google Workspace');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [grantDrafts, setGrantDrafts] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +106,34 @@ export default function GoogleWorkspaceConnections() {
       setError(err instanceof Error ? err.message : 'Unable to create Google Workspace connection.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const saveGrants = async (installation: GoogleWorkspaceInstallation) => {
+    setBusyId(installation.id);
+    setError(null);
+    setMessage(null);
+    const principalIds = (grantDrafts[installation.id] ?? (installation.grantedPrincipalIds ?? []).join(','))
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    try {
+      const response = await fetch(
+        `/api/connectors/google-workspace/${encodeURIComponent(installation.id)}/grants`,
+        {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ expectedVersion: installation.version, principalIds }),
+        },
+      );
+      await readJson<{ version: number }>(response);
+      setMessage('Connector sharing permissions updated.');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update connector sharing permissions.');
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -193,6 +224,33 @@ export default function GoogleWorkspaceConnections() {
                 </button>
               ) : null}
             </div>
+            {installation.state !== 'revoked' ? (
+              <div className="mt-2 w-full">
+                <label className="mb-1 block text-xs text-text-secondary" htmlFor={`connector-grants-${installation.id}`}>
+                  Share with tenant members (user IDs, comma-separated)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id={`connector-grants-${installation.id}`}
+                    className="min-w-0 flex-1 rounded-md border border-border-medium bg-surface-primary px-2 py-1 text-xs text-text-primary"
+                    value={grantDrafts[installation.id] ?? (installation.grantedPrincipalIds ?? []).join(', ')}
+                    onChange={(event) => setGrantDrafts((current) => ({
+                      ...current,
+                      [installation.id]: event.target.value,
+                    }))}
+                    aria-label={`Tenant member user IDs for ${installation.displayName}`}
+                  />
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-text-primary underline disabled:opacity-50"
+                    disabled={busyId === installation.id}
+                    onClick={() => void saveGrants(installation)}
+                  >
+                    Save sharing
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
