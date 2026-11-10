@@ -91,6 +91,16 @@ export class ConnectorHealthMonitor {
     try {
       await probe(installationId);
     } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+      if (code === 'CONNECTOR_ACCESS_DENIED') {
+        return {
+          installationId, status: 'skipped', state: installation.state,
+          consecutiveFailures: installation.consecutiveHealthFailures ?? 0,
+          errorCode: null,
+        };
+      }
       outcome = 'unhealthy';
       errorCode = safeHealthError(error, installation.provider);
     }
