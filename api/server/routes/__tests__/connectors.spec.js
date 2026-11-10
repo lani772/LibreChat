@@ -17,6 +17,8 @@ jest.mock('~/models', () => ({
   getConnectorInstallation: jest.fn(),
   listConnectorInstallations: jest.fn(),
   createConnectorInstallation: jest.fn(),
+  findUsers: jest.fn(),
+  updateConnectorInstallationGrants: jest.fn(),
 }));
 
 jest.mock('~/server/middleware', () => ({
@@ -131,6 +133,98 @@ describe('Google Workspace connector routes', () => {
     });
     expect(response.headers['cache-control']).toContain('no-store');
     expect(response.body.authorizationUrl).toContain('accounts.google.com');
+  });
+
+  it('updates personal connector grants only for verified members of the active tenant', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      _id: { toString: () => '507f1f77bcf86cd799439011' },
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+    db.findUsers.mockResolvedValue([{ _id: { toString: () => 'user-b' } }]);
+    db.updateConnectorInstallationGrants.mockResolvedValue({
+      _id: { toString: () => '507f1f77bcf86cd799439011' },
+      grantedPrincipalIds: ['user-b'],
+      version: 3,
+    });
+
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 2, principalIds: ['user-b', 'user-b'] });
+
+    expect(response.status).toBe(200);
+    expect(db.findUsers).toHaveBeenCalledWith(
+      { _id: { $in: ['user-b'] } },
+      '_id',
+      { limit: 100 },
+    );
+    expect(db.updateConnectorInstallationGrants).toHaveBeenCalledWith({
+      installationId: '507f1f77bcf86cd799439011',
+      expectedVersion: 2,
+      principalIds: ['user-b'],
+    });
+    expect(response.body).toEqual({
+      installationId: '507f1f77bcf86cd799439011',
+      grantedPrincipalIds: ['user-b'],
+      version: 3,
+    });
+  });
+
+  it('rejects grant requests containing users outside the active tenant', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+    db.findUsers.mockResolvedValue([]);
+
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 0, principalIds: ['user-from-another-tenant'] });
+
+    expect(response.status).toBe(400);
+    expect(db.updateConnectorInstallationGrants).not.toHaveBeenCalled();
+  });
+
+  it('hides grant management for installations not owned by the caller', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-b',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 0, principalIds: ['user-c'] });
+
+    expect(response.status).toBe(404);
+    expect(db.findUsers).not.toHaveBeenCalled();
+    expect(db.updateConnectorInstallationGrants).not.toHaveBeenCalled();
+  });
+
+  it('returns a conflict when a grant update loses the version race', async () => {
+    db.getConnectorInstallation.mockResolvedValue({
+      tenantId: 'tenant-a',
+      ownerUserId: 'user-a',
+      provider: 'google-workspace',
+      visibility: 'personal',
+      state: 'connected',
+    });
+    db.findUsers.mockResolvedValue([{ _id: { toString: () => 'user-b' } }]);
+    db.updateConnectorInstallationGrants.mockResolvedValue(null);
+
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 4, principalIds: ['user-b'] });
+
+    expect(response.status).toBe(409);
   });
 
   it('returns only safe status fields to the installation owner', async () => {
