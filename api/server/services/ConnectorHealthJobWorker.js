@@ -194,7 +194,7 @@ async function retryOwnerDeadHealthJob({ installationId, jobId }) {
   return { id: job._id.toString(), status: job.status, nextAttemptAt: job.nextAttemptAt };
 }
 
-async function claimJob() {
+async function claimJob({ model = HealthJob } = {}) {
   const now = new Date();
   const token = randomUUID();
   // Recover an expired lease atomically and append its audit event in the same
@@ -205,7 +205,7 @@ async function claimJob() {
     'warning',
     { recoveredAt: now.toISOString(), recovery: 'expired_lease' },
   );
-  const expired = await HealthJob.findOneAndUpdate(
+  const expired = await model.findOneAndUpdate(
     { status: 'processing', leaseUntil: { $lte: now } },
     [{
       $set: {
@@ -225,7 +225,7 @@ async function claimJob() {
   ).lean().exec();
   if (expired) return expired;
 
-  return HealthJob.findOneAndUpdate(
+  return model.findOneAndUpdate(
     { status: 'pending', nextAttemptAt: { $lte: now } },
     {
       $set: { status: 'processing', leaseToken: token, leaseUntil: new Date(now.getTime() + LEASE_MS) },
