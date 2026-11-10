@@ -7,6 +7,7 @@ function installation(overrides: Record<string, unknown> = {}) {
     provider: 'google-workspace',
     state: 'connected' as const,
     version: 4,
+    healthVersion: 2,
     consecutiveHealthFailures: 0,
     lastErrorCode: undefined,
     ...overrides,
@@ -31,7 +32,7 @@ describe('ConnectorHealthMonitor', () => {
       status: 'healthy', state: 'connected', consecutiveFailures: 0, errorCode: null,
     });
     expect(recordConnectorHealth).toHaveBeenCalledWith(expect.objectContaining({
-      outcome: 'healthy', expectedVersion: 4,
+      outcome: 'healthy', expectedHealthVersion: 2,
       checkedAt: new Date('2026-11-10T00:00:00.000Z'),
     }));
   });
@@ -53,11 +54,11 @@ describe('ConnectorHealthMonitor', () => {
     });
     const result = await monitor.checkInstallation(id);
     expect(result).toMatchObject({
-      status: 'unhealthy', errorCode: 'google-workspace_provider_unavailable',
+      status: 'unhealthy', errorCode: 'provider_unavailable',
     });
     expect(JSON.stringify(result)).not.toContain('private response body');
     expect(recordConnectorHealth).toHaveBeenCalledWith(expect.objectContaining({
-      outcome: 'unhealthy', errorCode: 'google-workspace_provider_unavailable',
+      outcome: 'unhealthy', errorCode: 'provider_unavailable',
     }));
   });
 
