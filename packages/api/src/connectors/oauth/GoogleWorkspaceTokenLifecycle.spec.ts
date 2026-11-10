@@ -137,13 +137,13 @@ describe('GoogleWorkspaceTokenLifecycle', () => {
     expect(adapter.revokeToken).toHaveBeenCalledWith({ token: 'stable-refresh' });
   });
 
-  it('reports pending when both durable enqueue and immediate remote revocation fail', async () => {
+  it('reports when remote revocation fails and durable retry could not be queued', async () => {
     const { lifecycle, adapter, revocations } = setup();
     revocations.enqueueGoogleWorkspaceRevocation.mockRejectedValue(new Error('database unavailable'));
     adapter.revokeToken.mockRejectedValue(new Error('provider unavailable'));
     await expect(lifecycle.disconnect('507f1f77bcf86cd799439011')).resolves.toEqual({
       disconnected: true,
-      remoteRevocation: 'pending',
+      remoteRevocation: 'retry_unavailable',
     });
   });
 });
