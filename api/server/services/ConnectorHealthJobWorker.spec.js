@@ -15,6 +15,7 @@ jest.mock('mongoose', () => {
   class Schema {
     index() {}
   }
+  Schema.Types = { Mixed: Object };
   return {
     Schema,
     models: {},
