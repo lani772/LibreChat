@@ -359,6 +359,7 @@ function stopConnectorHealthJobWorker() {
 }
 
 module.exports = {
+  claimJob,
   enqueueOwnerHealthCheck,
   listOwnerHealthJobs,
   retryOwnerDeadHealthJob,
