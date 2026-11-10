@@ -209,6 +209,26 @@ describe('Google Workspace connector routes', () => {
     expect(db.updateConnectorInstallationGrants).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed principal IDs before querying tenant users', async () => {
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 0, principalIds: ['not-an-object-id'] });
+
+    expect(response.status).toBe(400);
+    expect(db.getConnectorInstallation).not.toHaveBeenCalled();
+    expect(db.findUsers).not.toHaveBeenCalled();
+  });
+
+  it('does not require an explicit grant for the installation owner', async () => {
+    const response = await request(app)
+      .put('/api/connectors/google-workspace/507f1f77bcf86cd799439011/grants')
+      .send({ expectedVersion: 0, principalIds: ['user-a'] });
+
+    expect(response.status).toBe(400);
+    expect(db.getConnectorInstallation).not.toHaveBeenCalled();
+    expect(db.updateConnectorInstallationGrants).not.toHaveBeenCalled();
+  });
+
   it('returns a conflict when a grant update loses the version race', async () => {
     db.getConnectorInstallation.mockResolvedValue({
       tenantId: 'tenant-a',
