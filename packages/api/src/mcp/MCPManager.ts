@@ -2358,6 +2358,11 @@ Please follow these instructions when using tools from the respective MCP server
     const { signal } = context;
     const logPrefix = `[MCP][User: ${user.id}][${serverName}]`;
     const config = this.getAppServerConfig(context);
+    // MCP App resource and tool operations use a separate proxy path from callTool().
+    // Enforce connector ownership before the app connection is checked out as well.
+    if (this.connectorAuthorizationGuard) {
+      await this.connectorAuthorizationGuard(config);
+    }
     const directBearerRecovery = usesDirectOpenIDBearerRecovery(config);
     const directBearerRecoveryState: t.DirectBearerRecoveryState = { attempted: false };
     let oauthRecoveryAttempted = false;
@@ -2722,6 +2727,11 @@ Please follow these instructions when using tools from the respective MCP server
           ErrorCode.InvalidRequest,
           `${logPrefix} Tool "${toolName}" is not available to apps (visibility excludes "app").`,
         );
+      }
+      // Recheck at the dispatch boundary: a connector may have been revoked after
+      // the app operation began or while its tool catalog was being refreshed.
+      if (this.connectorAuthorizationGuard) {
+        await this.connectorAuthorizationGuard(this.getAppServerConfig(context));
       }
       return connection.client.request(
         {
