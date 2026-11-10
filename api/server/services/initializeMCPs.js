@@ -165,7 +165,9 @@ async function initializeMCPs() {
       process.env.GOOGLE_WORKSPACE_REDIRECT_URI &&
       googleScopes.length > 0 &&
       /^[a-f\d]{64}$/i.test(process.env.CONNECTOR_OAUTH_STATE_KEY || '') &&
-      /^[a-f\d]{64}$/i.test(process.env.CONNECTOR_CREDENTIALS_KEY || '')
+      ((Boolean(process.env.CONNECTOR_CREDENTIALS_KEYRING?.trim()) &&
+        Boolean(process.env.CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID?.trim())) ||
+        /^[a-f\d]{64}$/i.test(process.env.CONNECTOR_CREDENTIALS_KEY || ''))
     ) {
       try {
         await mongoose.models.GoogleOAuthState.createIndexes();
