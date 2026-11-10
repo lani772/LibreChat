@@ -26,9 +26,30 @@ This guard protects MCP discovery and execution. Google Workspace OAuth now has 
 
 Connector credentials are stored in the separate `connectorcredentials` collection, never in the connector installation document. The persistence layer stores only an encrypted envelope and safe metadata. Ciphertext is excluded from ordinary Mongoose projections; the internal ciphertext read method is intended to be called only inside `ConnectorCredentialVault.withCredentials()` after `ConnectorService.execute()` has authorized and audited the caller.
 
-New connector secrets use AES-256-GCM with a fresh 96-bit nonce per write. The tenant ID, installation ID, and provider are authenticated as additional data, so ciphertext cannot be transplanted between tenants, installations, or providers. Authentication-tag failure is fatal; there is no plaintext or legacy-cipher fallback. Payloads are limited to 64 KiB. The dedicated `CONNECTOR_CREDENTIALS_KEY` must be a 32-byte hexadecimal key supplied by the deployment secret manager; generate a value with `openssl rand -hex 32`. Do not commit the key or log it. Do not reuse `CREDS_KEY`.
+New connector secrets use AES-256-GCM with a fresh 96-bit nonce per write. The tenant ID, installation ID, and provider are authenticated as additional data, so ciphertext cannot be transplanted between tenants, installations, or providers. Authentication-tag failure is fatal; there is no plaintext or legacy-cipher fallback. Payloads are limited to 64 KiB. New deployments should use a versioned keyring supplied by the deployment secret manager:
+- `CONNECTOR_CREDENTIALS_KEYRING`: JSON object mapping key IDs to 64-character hexadecimal AES-256 keys (maximum 20 keys).
+- `CONNECTOR_CREDENTIALS_ACTIVE_KEY_ID`: key ID used for new writes.
+- `CONNECTOR_CREDENTIALS_KEY`: legacy key retained only to decrypt older envelopes that do not carry a key ID.
+
+Generate independent keys with `openssl rand -hex 32`. Do not commit keys, reuse `CREDS_KEY`, or log key material. Keep every old key in the keyring until all credentials encrypted under it have been migrated. Legacy envelopes still require the old `CONNECTOR_CREDENTIALS_KEY` until migration is complete.
 
 The new credential collection is included in the tenant index migration. Installation revocation marks the installation revoked before deleting its encrypted credential row; if cleanup fails, the revoked installation remains unusable and cleanup can be retried. Owner-only writes and deletes derive the owner from trusted request context. Authorized reads are tenant-scoped and are only exposed through the vault service. The initialized application service exposes the vault internally through `require('./initializeMCPs').getConnectorCredentialVault()` after MCP initialization. Provider adapters should use `storeCredentials()` for owner setup and `withCredentials()` for every provider request; they must never return credential values in tool results, model context, or logs.
+
+## Credential key rotation operation
+
+A bounded maintenance command is provided at `api/rotate-connector-credentials.js` (npm script: `npm --prefix api run rotate-connector-credentials -- ...`). It is deliberately not an HTTP endpoint.
+
+Safe rollout:
+1. Back up the database and store the new keyring in the deployment secret manager.
+2. Deploy every application instance with the same keyring and active key ID. Keep the legacy `CONNECTOR_CREDENTIALS_KEY` and all historical key IDs available. Do not run the migration while old application instances can still write using the legacy single-key configuration.
+3. Run a dry run first: `npm --prefix api run rotate-connector-credentials -- --dry-run --batch-size=50 --max-batches=10`.
+4. Review the summary, then apply: `npm --prefix api run rotate-connector-credentials -- --apply --batch-size=50 --max-batches=10`.
+5. If `complete` is false, rerun with the returned `resumeAfterId`: `--after=<resumeAfterId>`. Repeat until the command reports `complete: true`, `failed: 0`, and no outstanding conflicts after a final full scan.
+6. Only after a verified complete scan and backup-retention window may the legacy key be removed. Keep older key IDs until no stored envelope refers to them.
+
+The command defaults to dry-run; `--apply` is required to write. It accepts batches of 1–100 rows and at most 100 batches per invocation. The database scan and compare-and-set replacement methods independently require explicit system tenant context. Rows with active token-refresh leases are skipped. Replacement compares the original ciphertext and `updatedAt`, so a concurrent refresh/write is not overwritten; conflicts are counted and must be checked on a subsequent scan. An undecryptable row stops the run without logging plaintext, ciphertext, provider tokens, or the row ID; correct the key configuration and resume from the last safe cursor. The job can be rerun safely because envelopes already using the active key ID are skipped.
+
+This is an application-level rotation workflow, not KMS/HSM custody. Production key storage, access controls, key backup, approval, and emergency recovery remain responsibilities of the deployment secret manager and operator process.
 
 ## Provider OAuth adapter foundation
 
