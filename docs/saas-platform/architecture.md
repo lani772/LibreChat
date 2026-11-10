@@ -158,7 +158,8 @@ These findings mean that the current MCP support is a foundation, not proof that
 - [x] Add an authorized vault service that decrypts only inside `ConnectorService.execute()` after authorization and durable audit.
 - [x] Delete encrypted credential rows when an installation is revoked; include the collection in tenant index migration.
 - [x] Add tests for authenticated encryption, tamper detection, context binding, size limits, owner checks, tenant isolation, authorized reads, and revocation cleanup.
-- [x] Add versioned multi-key credential encryption with legacy-envelope compatibility.\n- [ ] Integrate KMS/HSM-backed key custody and complete fleet-wide credential re-encryption.
+- [x] Add versioned multi-key credential encryption with legacy-envelope compatibility.
+- [ ] Integrate KMS/HSM-backed key custody and complete fleet-wide credential re-encryption.
 - [x] Implement Google Workspace refresh-token preservation/rotation, cross-process refresh coordination, remote revocation, and local disconnect; concrete provider API adapters remain outstanding.
 - [ ] Run the focused Jest suites, package typechecks, lint, and integration tests in a configured checkout.
 
@@ -221,7 +222,9 @@ The orchestration service is wired to the production MongoDB state store, startu
 - [x] Make local revocation and encrypted credential cleanup retryable; report whether remote revocation was confirmed or remains pending.
 - [x] Add tests for token refresh, refresh-token preservation, lease contention, stale-lease fencing, invalid grants, remote revocation failure, and disconnect authorization.
 - [ ] Run the focused Jest suites, data-schema package tests, typechecks, lint, and integration tests in a configured checkout.
-- [x] Implement Google Drive read-only API operations, model-callable agent/assistant tool registration, and user-facing connection UI.\n- [x] Implement versioned multi-key credential envelope support with legacy decryption compatibility.\n- [ ] Implement production KMS/HSM key management, fleet-wide re-encryption, and durable remote-revocation retry.
+- [x] Implement Google Drive read-only API operations, model-callable agent/assistant tool registration, and user-facing connection UI.
+- [x] Implement versioned multi-key credential envelope support with legacy decryption compatibility.
+- [ ] Implement production KMS/HSM key management, fleet-wide re-encryption, and durable remote-revocation retry.
 
 The token lifecycle service is wired during MCP initialization and exposed only to internal server routes/provider adapters. The refresh lease is persisted in MongoDB and uses a fencing token so an expired lease holder cannot overwrite a newer credential record. Local disconnect blocks future connector access and removes encrypted credentials even when remote revocation fails; the API reports that remote revocation is pending in that case. Tests are authored but have not been executed. Google Drive metadata search/retrieval and its connection interface are implemented; Gmail integration is not part of this milestone.
 
@@ -250,7 +253,9 @@ No live Google OAuth test or local test execution has been performed. Tests are 
 - [x] Add tests for installation routes and tool account selection, routing, and error redaction.
 - [ ] Run the focused Jest suites, frontend tests, package typechecks, lint, and full regression suite in a dependency-enabled checkout.
 - [ ] Run a live Google OAuth + Drive read-only integration test using a dedicated authorized test account.
-- [ ] Add a durable remote-revocation retry/outbox for Google token revocation failures.\n- [x] Add versioned multi-key credential encryption and legacy-envelope compatibility.\n- [ ] Add an automated, audited fleet-wide credential re-encryption job and KMS/HSM-backed key management before production onboarding.
+- [ ] Add a durable remote-revocation retry/outbox for Google token revocation failures.
+- [x] Add versioned multi-key credential encryption and legacy-envelope compatibility.
+- [ ] Add an automated, audited fleet-wide credential re-encryption job and KMS/HSM-backed key management before production onboarding.
 
 The connection UI and model-callable tool are committed to the feature branch. Tests remain authored but unexecuted; no live Google account test has been performed.
 
