@@ -1,10 +1,10 @@
 import { Schema } from 'mongoose';
 import type { ConnectorRevocationDocument } from '~/types/connectorRevocation';
 
-const connectorRevocationSchema = new Schema<ConnectorRevocationDocument>(
+const connectorRevocationSchema: Schema<ConnectorRevocationDocument> = new Schema<ConnectorRevocationDocument>(
   {
     tenantId: { type: String, required: true, index: true, immutable: true },
-    installationId: { type: String, required: true, match: /^[a-f\\d]{24}$/i, immutable: true },
+    installationId: { type: String, required: true, match: /^[a-f\d]{24}$/i, immutable: true },
     provider: { type: String, enum: ['google-workspace'], required: true, immutable: true },
     encryptedPayload: { type: String, select: false, maxlength: 140_000 },
     state: { type: String, enum: ['pending', 'processing', 'complete', 'dead'], required: true, default: 'pending' },
