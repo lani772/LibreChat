@@ -101,6 +101,7 @@ export function createConnectorRevocationMethods(
     const job = await Revocation.findOneAndUpdate(
       {
         state: { $in: ['pending', 'processing'] },
+        encryptedPayload: { $exists: true, $ne: null },
         nextAttemptAt: { $lte: now },
         $or: [
           { leaseUntil: { $exists: false } },
