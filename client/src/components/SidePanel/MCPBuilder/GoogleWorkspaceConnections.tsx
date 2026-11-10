@@ -116,14 +116,12 @@ export default function GoogleWorkspaceConnections() {
         credentials: 'include',
         headers: { Accept: 'application/json' },
       });
-      const result = await readJson<{ remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' | 'retry_unavailable' }>(response);
+      const result = await readJson<{ remoteRevocation: 'confirmed' | 'pending' | 'not_attempted' }>(response);
       setMessage(result.remoteRevocation === 'confirmed'
         ? 'Google Workspace disconnected and remote revocation confirmed.'
         : result.remoteRevocation === 'pending'
           ? 'Local access is disabled. Google remote revocation has been queued or is awaiting retry.'
-          : result.remoteRevocation === 'retry_unavailable'
-            ? 'Local access is disabled, but Google revocation failed and retry could not be queued. Contact an administrator.'
-            : 'Local access is disabled, but no Google token was available to revoke.');
+          : 'Local access is disabled, but remote revocation could not be queued or attempted. Contact an administrator.');
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to disconnect Google Workspace.');
