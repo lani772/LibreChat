@@ -57,6 +57,7 @@ export default function ConnectorGovernance() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalAudit, setTotalAudit] = useState(0);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
 
   const loadInventory = useCallback(async () => {
     setLoading(true);
@@ -76,18 +77,21 @@ export default function ConnectorGovernance() {
     }
   }, []);
 
-  const loadAudit = useCallback(async () => {
+  const loadAudit = useCallback(async (cursor?: number, append = false) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/connectors/audit?limit=50', {
+      const query = new URLSearchParams({ limit: '50' });
+      if (cursor != null) query.set('cursor', String(cursor));
+      const response = await fetch(`/api/admin/connectors/audit?${query.toString()}`, {
         credentials: 'include',
         headers: { Accept: 'application/json' },
         cache: 'no-store',
       });
       const data = await readResponse<AuditResponse>(response);
-      setEntries(data.entries);
+      setEntries((current) => append ? [...current, ...data.entries] : data.entries);
       setTotalAudit(data.total);
+      setNextCursor(data.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load connector audit history.');
     } finally {
@@ -182,6 +186,7 @@ export default function ConnectorGovernance() {
             </article>
           ))}
           {entries.length === 0 && <p className="py-4 text-center text-sm text-text-secondary">No connector invocation events found.</p>}
+          {nextCursor != null && <div className="pt-2 text-center"><Button size="sm" variant="outline" disabled={loading} onClick={() => void loadAudit(nextCursor, true)}>Load older events</Button></div>}
         </div>
       )}
     </section>
