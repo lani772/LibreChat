@@ -180,10 +180,6 @@ async function initializeMCPs() {
         googleWorkspaceOAuthFlow = new GoogleWorkspaceOAuthFlow({
           adapter,
           vault: connectorCredentialVault,
-          revocations: {
-            enqueueGoogleWorkspaceRevocation: (input) =>
-              db.enqueueGoogleWorkspaceRevocation(input),
-          },
           installations: {
             getConnectorInstallation: (installationId) =>
               db.getConnectorInstallation(installationId),
@@ -237,6 +233,10 @@ async function initializeMCPs() {
         googleWorkspaceTokenLifecycle = new GoogleWorkspaceTokenLifecycle({
           adapter,
           vault: connectorCredentialVault,
+          revocations: {
+            enqueueGoogleWorkspaceRevocation: (input) =>
+              db.enqueueGoogleWorkspaceRevocation(input),
+          },
           installations: {
             getConnectorInstallation: (installationId) =>
               db.getConnectorInstallation(installationId),
