@@ -28,6 +28,14 @@ export interface ConnectorCredentialStore {
 
 export type ConnectorCredentialValues = Record<string, unknown>;
 
+export interface ConnectorCredentialSnapshot {
+  tenantId: string;
+  installationId: string;
+  provider: string;
+  /** Existing encrypted envelope copied only to the protected revocation outbox. */
+  encryptedPayload: string;
+}
+
 /**
  * The only application service allowed to turn connector credential ciphertext
  * into plaintext. Reads are nested inside ConnectorService authorization so
@@ -73,7 +81,7 @@ export class ConnectorCredentialVault {
 
   async withCredentials<TResult>(
     installationId: string,
-    operation: (credentials: ConnectorCredentialValues) => Promise<TResult>,
+    operation: (credentials: ConnectorCredentialValues, snapshot: ConnectorCredentialSnapshot) => Promise<TResult>,
   ): Promise<TResult> {
     return this.connectors.execute(installationId, async (authorized) => {
       const stored = await this.store.getConnectorCredentialCiphertext(installationId);
@@ -101,7 +109,12 @@ export class ConnectorCredentialVault {
       if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials)) {
         throw new Error('Stored connector credential payload is invalid');
       }
-      return operation(credentials as ConnectorCredentialValues);
+      return operation(credentials as ConnectorCredentialValues, {
+        tenantId: authorized.tenantId,
+        installationId,
+        provider: authorized.installation.provider,
+        encryptedPayload: stored.encryptedPayload,
+      });
     });
   }
 
