@@ -5,6 +5,7 @@ const { ConnectorHealthRetryPolicy } = require('@librechat/api');
 
 const POLL_INTERVAL_MS = 10_000;
 const LEASE_MS = 60_000;
+const LEASE_RENEW_INTERVAL_MS = Math.floor(LEASE_MS / 3);
 const SUCCESS_INTERVAL_MS = 24 * 60 * 60_000;
 const COLLECTION = 'connectorhealthjobs';
 
@@ -241,6 +242,44 @@ async function updateClaim(job, update) {
   return result.modifiedCount === 1;
 }
 
+/** Extend only the exact lease/fence we claimed; a stale worker cannot renew a successor's lease. */
+async function renewClaim(job) {
+  const result = await HealthJob.updateOne(
+    { _id: job._id, status: 'processing', leaseToken: job.leaseToken, fence: job.fence },
+    { $set: { leaseUntil: new Date(Date.now() + LEASE_MS) } },
+  ).exec();
+  return result.modifiedCount === 1;
+}
+
+/**
+ * Provider calls may outlive the initial lease. Heartbeat while probing and
+ * refuse to persist a result after any heartbeat proves that ownership was lost.
+ */
+async function withClaimLease(job, operation) {
+  let leaseLost = false;
+  let renewing = false;
+  const heartbeat = setInterval(async () => {
+    if (renewing || leaseLost) return;
+    renewing = true;
+    try {
+      const renewed = await runAsSystem(() => renewClaim(job));
+      if (!renewed) leaseLost = true;
+    } catch {
+      // Uncertainty is treated as lost ownership; a successor can safely reclaim.
+      leaseLost = true;
+    } finally {
+      renewing = false;
+    }
+  }, LEASE_RENEW_INTERVAL_MS);
+  heartbeat.unref?.();
+  try {
+    const result = await operation();
+    return leaseLost ? { leaseLost: true } : { leaseLost: false, result };
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
 async function processClaim(job, monitor, db) {
   const identity = { tenantId: job.tenantId, userId: job.ownerUserId };
   return tenantStorage.run(identity, async () => {
@@ -257,7 +296,9 @@ async function processClaim(job, monitor, db) {
       return;
     }
 
-    const result = await monitor.checkInstallation(job.installationId);
+    const probe = await withClaimLease(job, () => monitor.checkInstallation(job.installationId));
+    if (probe.leaseLost) return;
+    const result = probe.result;
     if (result.status === 'healthy') {
       await updateClaim(job, {
         $set: {
@@ -331,10 +372,11 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
           const decision = retryPolicy.decide({ errorCode: 'PROVIDER_UNAVAILABLE', attempt: nextAttempt });
           await runAsSystem(async () => updateClaim(job, decision.retry ? {
             $set: { status: 'pending', attempt: nextAttempt, nextAttemptAt: decision.nextAttemptAt, lastErrorCode: decision.errorCode },
+            $push: { auditOutbox: healthJobAuditEvent('connector.health_job_retry_scheduled', 'pending', 'warning', { attempt: nextAttempt, errorCode: decision.errorCode, nextAttemptAt: decision.nextAttemptAt.toISOString(), fence: job.fence, source: 'worker_exception' }) },
             $unset: { leaseToken: 1, leaseUntil: 1 },
           } : {
             $set: { status: 'dead', attempt: nextAttempt, lastErrorCode: decision.errorCode },
-            $push: { auditOutbox: healthJobAuditEvent('connector.health_job_dead_lettered', 'failure', 'critical', { attempt: nextAttempt, errorCode: decision.errorCode, fence: job.fence }) },
+            $push: { auditOutbox: healthJobAuditEvent('connector.health_job_dead_lettered', 'failure', 'critical', { attempt: nextAttempt, errorCode: decision.errorCode, fence: job.fence, source: 'worker_exception' }) },
             $unset: { activeKey: 1, leaseToken: 1, leaseUntil: 1 },
           })).catch(() => false);
           await flushHealthJobAuditOutbox(job._id, database).catch(() => undefined);
@@ -360,6 +402,7 @@ function stopConnectorHealthJobWorker() {
 
 module.exports = {
   claimJob,
+  renewClaim,
   enqueueOwnerHealthCheck,
   listOwnerHealthJobs,
   retryOwnerDeadHealthJob,
