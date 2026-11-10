@@ -37,9 +37,9 @@ export interface ConnectorCredentialSnapshot {
 }
 
 /**
- * The only application service allowed to turn connector credential ciphertext
- * into plaintext. Reads are nested inside ConnectorService authorization so
- * an unauthorized caller cannot trigger vault access or decryption.
+ * Normal provider execution must decrypt through this vault after ConnectorService
+ * authorization and audit. The only exceptions are tightly scoped system-context
+ * maintenance operations: credential key rotation and the remote-revocation worker.
  */
 export class ConnectorCredentialVault {
   constructor(
