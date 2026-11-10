@@ -132,7 +132,7 @@ async function listOwnerHealthJobs({ installationId, limit = 10 }) {
   if (!tenantId || !ownerUserId || tenantId === '__SYSTEM__') {
     throw new Error('Health job visibility requires an authenticated tenant owner context');
   }
-  if (!/^[a-f\\d]{24}$/i.test(installationId) || !Number.isInteger(limit) || limit < 1 || limit > 20) {
+  if (!/^[a-f\d]{24}$/i.test(installationId) || !Number.isInteger(limit) || limit < 1 || limit > 20) {
     throw new Error('Invalid connector health job query');
   }
   await indexesReady;
