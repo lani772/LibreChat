@@ -194,7 +194,7 @@ export default function GoogleWorkspaceConnections() {
       ) : null}
       <ul className="space-y-2">
         {installations.map((installation) => (
-          <li key={installation.id} className="flex items-center justify-between gap-3 rounded-md bg-surface-secondary px-2.5 py-2">
+          <li key={installation.id} className="flex flex-col items-stretch gap-3 rounded-md bg-surface-secondary px-2.5 py-2">
             <div className="min-w-0">
               <p className="truncate text-sm text-text-primary">{installation.displayName}</p>
               <p className="text-xs text-text-secondary">
