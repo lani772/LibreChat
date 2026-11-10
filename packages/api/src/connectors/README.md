@@ -235,7 +235,7 @@ Disconnected, authorizing, errored, and revoked installations are never revived 
 probe. Stale observations lose their compare-and-set update rather than overwriting a concurrent
 disconnect, reauthorization, or grant/state change.
 
-Only an explicit health-check authorization path permits a degraded installation to be probed; ordinary MCP tool execution remains denied while degraded. The Google Drive adapter exposes a minimal metadata-only health probe using the existing
+A degraded installation remains authorized for ordinary calls while displaying a health warning; tenant membership, ownership/grants, and tenant role permissions continue to be enforced on every call. The Google Drive adapter exposes a minimal metadata-only health probe using the existing
 read-only files-list endpoint, the existing authorization boundary, granted OAuth scope check,
 and short provider timeout. The monitor itself does not schedule work: deployments should
 invoke bounded checks from their existing scheduler/worker under an authorized tenant context.
