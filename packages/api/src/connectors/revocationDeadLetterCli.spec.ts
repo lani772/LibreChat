@@ -45,6 +45,18 @@ describe('Google Workspace revocation dead-letter CLI', () => {
     expect(JSON.parse(h.output[0])).toEqual({ id, requeued: true });
   });
 
+  it('returns a non-zero status when a dead letter cannot be requeued', async () => {
+    const h = harness();
+    h.deps.store.requeueGoogleWorkspaceRevocationDeadLetter.mockResolvedValue(false);
+    expect(
+      await runGoogleWorkspaceRevocationDeadLetterCli(
+        ['retry', '--id=64b000000000000000000001'],
+        h.deps,
+      ),
+    ).toBe(1);
+    expect(h.errors[0]).toContain('Dead letter was not requeued');
+  });
+
   it('rejects unknown commands, malformed IDs, and duplicate flags before connecting', async () => {
     const h = harness();
     expect(await runGoogleWorkspaceRevocationDeadLetterCli(['purge'], h.deps)).toBe(2);
