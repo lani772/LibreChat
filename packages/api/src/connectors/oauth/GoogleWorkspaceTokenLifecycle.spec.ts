@@ -28,8 +28,8 @@ function setup(initial = {
     revokeToken: jest.fn().mockResolvedValue(undefined),
   };
   const vault = {
-    withCredentials: jest.fn(async (_id: string, operation: (value: typeof stored) => Promise<unknown>) =>
-      operation(stored),
+    withCredentials: jest.fn(async (_id: string, operation: (value: typeof stored, snapshot: { tenantId: string; installationId: string; provider: string; encryptedPayload: string }) => Promise<unknown>) =>
+      operation(stored, { tenantId: 'tenant-a', installationId: _id, provider: 'google-workspace', encryptedPayload: JSON.stringify({ version: 'gcm1', ciphertext: 'encrypted' }) }),
     ),
     claimRefreshLease: jest.fn().mockResolvedValue(true),
     releaseRefreshLease: jest.fn().mockResolvedValue(true),
@@ -37,6 +37,9 @@ function setup(initial = {
       stored = { ...values };
       return { credentialPresent: true };
     }),
+  };
+  const revocations = {
+    enqueueGoogleWorkspaceRevocation: jest.fn().mockResolvedValue({ id: 'job-1', state: 'pending' }),
   };
   const installations = {
     getConnectorInstallation: jest.fn().mockResolvedValue({ ...installation }),
@@ -46,11 +49,12 @@ function setup(initial = {
   const lifecycle = new GoogleWorkspaceTokenLifecycle({
     adapter,
     vault: vault as never,
+    revocations,
     installations,
     now: () => 5_000,
     newLeaseToken: () => 'lease-token',
   });
-  return { lifecycle, adapter, vault, installations, getStored: () => stored };
+  return { lifecycle, adapter, vault, installations, revocations, getStored: () => stored };
 }
 
 describe('GoogleWorkspaceTokenLifecycle', () => {
@@ -108,24 +112,38 @@ describe('GoogleWorkspaceTokenLifecycle', () => {
     );
   });
 
-  it('revokes locally even if Google remote revocation is unavailable', async () => {
-    const { lifecycle, adapter, installations } = setup();
-    adapter.revokeToken.mockRejectedValue(new Error('provider unavailable'));
+  it('persists an encrypted revocation job before local credential cleanup', async () => {
+    const { lifecycle, installations, revocations } = setup();
     await expect(lifecycle.disconnect('507f1f77bcf86cd799439011')).resolves.toEqual({
       disconnected: true,
       remoteRevocation: 'pending',
+    });
+    expect(revocations.enqueueGoogleWorkspaceRevocation).toHaveBeenCalledWith({
+      installationId: '507f1f77bcf86cd799439011',
+      encryptedPayload: JSON.stringify({ version: 'gcm1', ciphertext: 'encrypted' }),
     });
     expect(installations.revokeConnectorInstallation).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439011',
     );
   });
 
-  it('reports successful remote revocation and local credential cleanup', async () => {
-    const { lifecycle, adapter } = setup();
+  it('falls back to immediate remote revocation if the durable outbox is unavailable', async () => {
+    const { lifecycle, adapter, revocations } = setup();
+    revocations.enqueueGoogleWorkspaceRevocation.mockRejectedValue(new Error('database unavailable'));
     await expect(lifecycle.disconnect('507f1f77bcf86cd799439011')).resolves.toEqual({
       disconnected: true,
       remoteRevocation: 'confirmed',
     });
     expect(adapter.revokeToken).toHaveBeenCalledWith({ token: 'stable-refresh' });
+  });
+
+  it('reports pending when both durable enqueue and immediate remote revocation fail', async () => {
+    const { lifecycle, adapter, revocations } = setup();
+    revocations.enqueueGoogleWorkspaceRevocation.mockRejectedValue(new Error('database unavailable'));
+    adapter.revokeToken.mockRejectedValue(new Error('provider unavailable'));
+    await expect(lifecycle.disconnect('507f1f77bcf86cd799439011')).resolves.toEqual({
+      disconnected: true,
+      remoteRevocation: 'pending',
+    });
   });
 });
