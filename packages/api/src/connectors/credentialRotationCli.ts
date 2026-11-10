@@ -72,7 +72,7 @@ export async function runConnectorCredentialRotationCli(
       }),
     );
     deps.write(JSON.stringify(result));
-    return result.failed > 0 ? 1 : 0;
+    return result.failed > 0 || result.revocationFailed > 0 ? 1 : 0;
   } finally {
     if (connected) await deps.disconnect();
   }
