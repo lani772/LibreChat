@@ -10,7 +10,7 @@ export interface ConnectorHealthRecord {
 
 export interface ConnectorHealthStore {
   getConnectorInstallation(id: string): Promise<ConnectorHealthRecord | null>;
-  listConnectorHealthCandidates(options: { limit: number }): Promise<ConnectorHealthRecord[]>;
+  listConnectorHealthCandidates(options: { limit: number; providers?: string[] }): Promise<ConnectorHealthRecord[]>;
   recordConnectorHealth(input: {
     installationId: string;
     expectedHealthVersion: number;
@@ -130,7 +130,11 @@ export class ConnectorHealthMonitor {
     if (!Number.isInteger(limit) || limit < 1 || limit > 25) {
       throw new Error('Connector health batch size must be between 1 and 25');
     }
-    const candidates = await this.store.listConnectorHealthCandidates({ limit });
+    const providers = Object.keys(this.probes);
+    if (providers.length === 0) {
+      return { checked: 0, healthy: 0, unhealthy: 0, skipped: 0, stale: 0, results: [] };
+    }
+    const candidates = await this.store.listConnectorHealthCandidates({ limit, providers });
     const results: ConnectorHealthResult[] = [];
     for (const installation of candidates) {
       results.push(await this.checkInstallation(installation._id.toString()));
