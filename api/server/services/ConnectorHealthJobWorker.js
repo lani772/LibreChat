@@ -156,14 +156,36 @@ async function listOwnerHealthJobs({ installationId, limit = 10 }) {
 async function claimJob() {
   const now = new Date();
   const token = randomUUID();
+  // Recover an expired lease atomically and append its audit event in the same
+  // Mongo update. The prior fence is captured before incrementing it.
+  const leaseEvent = healthJobAuditEvent(
+    'connector.health_job_lease_recovered',
+    'pending',
+    'warning',
+    { recoveredAt: now.toISOString(), recovery: 'expired_lease' },
+  );
+  const expired = await HealthJob.findOneAndUpdate(
+    { status: 'processing', leaseUntil: { $lte: now } },
+    [{
+      $set: {
+        status: 'processing',
+        leaseToken: token,
+        leaseUntil: new Date(now.getTime() + LEASE_MS),
+        fence: { $add: ['$fence', 1] },
+        auditOutbox: {
+          $concatArrays: [
+            { $ifNull: ['$auditOutbox', []] },
+            [{ ...leaseEvent, metadata: { ...leaseEvent.metadata, previousFence: '$fence' } }],
+          ],
+        },
+      },
+    }],
+    { new: true, sort: { leaseUntil: 1, createdAt: 1 } },
+  ).lean().exec();
+  if (expired) return expired;
+
   return HealthJob.findOneAndUpdate(
-    {
-      nextAttemptAt: { $lte: now },
-      $or: [
-        { status: 'pending' },
-        { status: 'processing', leaseUntil: { $lte: now } },
-      ],
-    },
+    { status: 'pending', nextAttemptAt: { $lte: now } },
     {
       $set: { status: 'processing', leaseToken: token, leaseUntil: new Date(now.getTime() + LEASE_MS) },
       $inc: { fence: 1 },
@@ -263,6 +285,7 @@ function startConnectorHealthJobWorker({ monitor, db: database }) {
         const job = await runAsSystem(async () => claimJob());
         if (!job) break;
         try {
+          await flushHealthJobAuditOutbox(job._id, database).catch(() => undefined);
           await processClaim(job, monitor, database);
         } catch {
           const nextAttempt = job.attempt + 1;
