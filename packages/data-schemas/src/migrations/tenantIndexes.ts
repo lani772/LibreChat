@@ -8,6 +8,7 @@ import accessRoleSchema from '~/schema/accessRole';
 import mcpServerSchema from '~/schema/mcpServer';
 import connectorInstallationSchema from '~/schema/connectorInstallation';
 import connectorCredentialSchema from '~/schema/connectorCredential';
+import connectorRevocationSchema from '~/schema/connectorRevocation';
 import messageSchema from '~/schema/message';
 import presetSchema from '~/schema/preset';
 import agentSchema from '~/schema/agent';
@@ -31,6 +32,7 @@ const TENANT_SCHEMAS = {
   mcpservers: mcpServerSchema,
   connectorinstallations: connectorInstallationSchema,
   connectorcredentials: connectorCredentialSchema,
+  connectorrevocations: connectorRevocationSchema,
   files: fileSchema,
   groups: groupSchema,
   skillsyncstatuses: skillSyncStatusSchema,
