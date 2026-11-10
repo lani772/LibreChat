@@ -62,6 +62,15 @@ describe('connector credential encryption rotation', () => {
         row.encryptedPayload = encryptedPayload;
         return true;
       }),
+      listConnectorRevocationsForRotation: jest.fn(async ({ afterId, limit }) =>
+        rows.filter((row) => !afterId || row.id > afterId).slice(0, limit),
+      ),
+      replaceConnectorRevocationForRotation: jest.fn(async ({ id, expectedEncryptedPayload, encryptedPayload }) => {
+        const row = rows.find((item) => item.id === id);
+        if (!row || row.encryptedPayload !== expectedEncryptedPayload) return false;
+        row.encryptedPayload = encryptedPayload;
+        return true;
+      }),
     };
   }
 
@@ -72,7 +81,7 @@ describe('connector credential encryption rotation', () => {
 
     const result = await rotateConnectorCredentialEncryption({ store, batchSize: 10 });
 
-    expect(result).toMatchObject({ scanned: 1, migrated: 1, failed: 0, complete: true });
+    expect(result).toMatchObject({ scanned: 1, migrated: 1, revocationsScanned: 1, revocationsAlreadyCurrent: 1, failed: 0, revocationFailed: 0, complete: true });
     const envelope = JSON.parse(row.encryptedPayload);
     expect(envelope.keyId).toBe('key-2026-11');
     expect(
